@@ -88,6 +88,7 @@ int main(int argc, char **argv) {
     return 1;
   }
   show_set_platform("Nintendo Switch", "Hello from Nintendo Switch!");
+  show_set_offline_key("Minus");
   char neterr[128];
   conn_global_init(neterr, sizeof neterr);
   net_start(now_ms());

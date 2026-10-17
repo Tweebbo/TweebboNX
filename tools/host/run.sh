@@ -13,9 +13,9 @@ rm -f build/host/shot.png
 # romfs:/ paths resolve to a directory literally called "romfs:" next to the binary.
 ln -sfn ../../romfs "build/host/romfs:"
 podman run --rm --network host -v "$PWD":/work:z -w /work -e SHOT=/work/build/host/shot.png \
-  -e SHOT_MS="${SHOT_MS:-20000}" -e QUIT_MS="${QUIT_MS:-25000}" tweebbo-switch-host bash -c '
+  -e SERVER="${SERVER:-}" -e OFFLINE_MS="${OFFLINE_MS:-}" -e SHOT_MS="${SHOT_MS:-20000}" -e QUIT_MS="${QUIT_MS:-25000}" tweebbo-switch-host bash -c '
   set -e
-  gcc -std=gnu11 -O2 -Wall -DTWEEBBO_HOST -DTWEEBBO_DEVICE=2 -DAPP_VERSION="\"$(cat VERSION)-host\"" -D_GNU_SOURCE \
+  gcc -std=gnu11 -O2 -Wall -DTWEEBBO_HOST -DTWEEBBO_DEVICE=2 -DTWEEBBO_LAN_ONLY=1 -DDEFAULT_SERVER="\"${SERVER:-ws://127.0.0.1:8096}\"" -DAPP_VERSION="\"$(cat VERSION)-host\"" -D_GNU_SOURCE \
     -Isource $(sdl2-config --cflags) -o build/host/tweebbo-host \
     source/*.c source/gen/*.c source/nx/gfx.c source/nx/conn.c tools/host/main.c \
     $(sdl2-config --libs) -lSDL2_image -lmbedtls -lmbedx509 -lmbedcrypto -lpthread -lm

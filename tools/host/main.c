@@ -2,7 +2,7 @@
 // and the same SDL2 renderer (source/nx/gfx.c) as the console build, with a keyboard in place
 // of the Joy-Con and POSIX sockets in place of bsd:u. It exists to test the Switch code path
 // against a hotel on this PC; it is not a product.
-//   Keys: arrows walk, Z = A, X = B, A = X, S = Y, Q/W = L/R, Escape quits.
+//   Keys: arrows walk, Z = A, X = B, A = X, S = Y, Q/W = L/R, O = Minus (offline), Escape quits.
 #include <SDL.h>
 #include <stdarg.h>
 #include <stdio.h>
@@ -75,6 +75,7 @@ int main(int argc, char **argv) {
   srand((unsigned)now_ms());
   if (!gfx_init()) return 1;
   show_set_platform("Nintendo Switch", "Hello from Nintendo Switch!");
+  show_set_offline_key("O");
   char neterr[128];
   conn_global_init(neterr, sizeof neterr);
   net_start(now_ms());
@@ -94,6 +95,7 @@ int main(int argc, char **argv) {
           case SDLK_s: show_action(SHOW_Y); break;
           case SDLK_q: show_action(SHOW_L); break;
           case SDLK_w: show_action(SHOW_R); break;
+          case SDLK_o: show_action(SHOW_OFFLINE); break;
           case SDLK_ESCAPE: running = false; break;
         }
       }
@@ -104,6 +106,10 @@ int main(int argc, char **argv) {
       int dx = k[SDL_SCANCODE_RIGHT] - k[SDL_SCANCODE_LEFT], dy = k[SDL_SCANCODE_DOWN] - k[SDL_SCANCODE_UP];
       if (dx || dy) { show_walk(dx, dy); next_step = now + 180; }
     }
+    /* Test hook: OFFLINE_MS presses Minus once at that time (the offline toggle). */
+    static bool pressed;
+    const char *press = getenv("OFFLINE_MS");
+    if (press && !pressed && now - start >= (u64)atoll(press)) { pressed = true; dbg_log("host: Minus pressed"); show_action(SHOW_OFFLINE); }
     net_update(now);
     gfx_frame();
     gfx_begin();
