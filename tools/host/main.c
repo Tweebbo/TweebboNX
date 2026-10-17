@@ -109,7 +109,7 @@ int main(int argc, char **argv) {
     /* Test hook: OFFLINE_MS presses Minus once at that time (the offline toggle). */
     static bool pressed;
     const char *press = getenv("OFFLINE_MS");
-    if (press && !pressed && now - start >= (u64)atoll(press)) { pressed = true; dbg_log("host: Minus pressed"); show_action(SHOW_OFFLINE); }
+    if (press && *press && !pressed && now - start >= (u64)atoll(press)) { pressed = true; dbg_log("host: Minus pressed"); show_action(SHOW_OFFLINE); }
     net_update(now);
     gfx_frame();
     gfx_begin();
