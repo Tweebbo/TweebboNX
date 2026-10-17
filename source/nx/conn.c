@@ -12,7 +12,15 @@
 #include <netinet/in.h>
 #include <unistd.h>
 
+#ifdef __SWITCH__
 #include <switch.h>
+#else
+/* Desktop harness (tools/host): POSIX sockets need no service, entropy comes from the OS. */
+#include <sys/random.h>
+typedef int Result;
+#define R_FAILED(r) ((r) != 0)
+#define R_SUCCEEDED(r) ((r) == 0)
+#endif
 
 #ifndef NO_TLS
 #include <mbedtls/ctr_drbg.h>
@@ -68,15 +76,21 @@ bool endpoint_parse(const char *url, Endpoint *out) {
 /** Entropy: csrng (hardware), then the system tick. */
 static int entropy(void *ctx, unsigned char *out, size_t len) {
   (void)ctx;
+#ifdef __SWITCH__
   if (R_SUCCEEDED(csrngGetRandomBytes(out, len))) return 0;
   u64 x = armGetSystemTick() * 0x9E3779B97F4A7C15ull;
   for (size_t i = 0; i < len; i++) { x ^= armGetSystemTick(); x ^= x << 13; x ^= x >> 7; x ^= x << 17; out[i] = (u8)(x >> 24); }
   return 0;
+#else
+  return getrandom(out, len, 0) == (ssize_t)len ? 0 : -1;
+#endif
 }
 
 static bool tls_init(char *err, int err_cap) {
   if (T.ready) return true;
+#ifdef __SWITCH__
   csrngInitialize();
+#endif
   mbedtls_ctr_drbg_init(&T.drbg);
   mbedtls_x509_crt_init(&T.roots);
   mbedtls_ssl_config_init(&T.conf);
@@ -97,18 +111,20 @@ static bool tls_init(char *err, int err_cap) {
 bool conn_global_init(char *err, int err_cap) {
   err[0] = 0;
   if (!sockets_ready) {
-    // Compact initial TCP buffers: WebSocket + API requests + updates must never exhaust the
-    // shared BSD pool (the ENOBUFS lesson from NX-torrent-player).
-    static const SocketInitConfig cfg = {
-      .tcp_tx_buf_size = 0x2000,
-      .tcp_rx_buf_size = 0x2000,
-      .tcp_tx_buf_max_size = 0x8000,
-      .tcp_rx_buf_max_size = 0x8000,
-      .udp_tx_buf_size = 0x1000,
-      .udp_rx_buf_size = 0x1000,
-      .sb_efficiency = 4,
-    };
+    // Start from the libnx defaults: they carry the BSD session count and service type,
+    // which a designated initializer would leave at 0 (socketInitialize then fails on
+    // hardware). Only the TCP buffers are trimmed so the shared BSD pool never runs out
+    // (the ENOBUFS lesson from NX-torrent-player).
+#ifdef __SWITCH__
+    SocketInitConfig cfg = *socketGetDefaultInitConfig();
+    cfg.tcp_tx_buf_size = 0x4000;
+    cfg.tcp_rx_buf_size = 0x8000;
+    cfg.tcp_tx_buf_max_size = 0x20000;
+    cfg.tcp_rx_buf_max_size = 0x20000;
     Result r = socketInitialize(&cfg);
+#else
+    Result r = 0;
+#endif
     if (R_FAILED(r)) {
       snprintf(err, (size_t)err_cap, "Network service unavailable (0x%08lX). Is Wi-Fi on?", (unsigned long)r);
       return false;
@@ -127,7 +143,10 @@ void conn_global_exit(void) {
     T.ready = false;
   }
 #endif
-  if (sockets_ready) { socketExit(); sockets_ready = false; }
+#ifdef __SWITCH__
+  if (sockets_ready) socketExit();
+#endif
+  sockets_ready = false;
 }
 
 static bool wait_fd(int fd, short events, int timeout_ms) {

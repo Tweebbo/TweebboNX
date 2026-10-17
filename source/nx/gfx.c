@@ -11,7 +11,7 @@
 #include "world.h"
 
 #define ATLAS_PAGES 5
-#define FURNI_CACHE 96
+#define FURNI_CACHE 512 /* never evict inside a busy room: a miss decodes a PNG mid-frame */
 
 static SDL_Window *win;
 static SDL_Renderer *ren;
@@ -290,3 +290,15 @@ void draw_line(float x1, float y1, float x2, float y2, u32 color) {
   set_color(color);
   SDL_RenderDrawLineF(ren, x1, y1, x2, y2);
 }
+
+#ifdef TWEEBBO_HOST
+/* Desktop harness only: saves the frame being drawn (before present) as a PNG. */
+void gfx_screenshot(const char *path) {
+  int w, h;
+  SDL_GetRendererOutputSize(ren, &w, &h);
+  SDL_Surface *s = SDL_CreateRGBSurfaceWithFormat(0, w, h, 32, SDL_PIXELFORMAT_ABGR8888);
+  if (!s) return;
+  if (SDL_RenderReadPixels(ren, NULL, SDL_PIXELFORMAT_ABGR8888, s->pixels, s->pitch) == 0) IMG_SavePNG(s, path);
+  SDL_FreeSurface(s);
+}
+#endif

@@ -17,10 +17,13 @@ and the Vita.
 - **Platform rules**:
   - Never write synchronously to `sdmc:/` from the render thread; use the RAM log ring
     (`source/nx/log.c`).
-  - Keep the tuned `SocketInitConfig` in `source/nx/conn.c` (prevents `ENOBUFS`).
+  - Keep the tuned `SocketInitConfig` in `source/nx/conn.c` (prevents `ENOBUFS`). Always start
+    from `socketGetDefaultInitConfig()`: a designated initializer leaves `num_bsd_sessions` and
+    `bsd_service_type` at 0 and the network never comes up on hardware.
   - Never poll the `ts` temperature sensor service or override system clocks.
   - Touch and pad are read in the same frame (do not swallow the first A after a touch).
 - **Verification**: `./build.sh` must produce `out/tweebbo.nro` from a clean tree. Run the
   cross-play check against a local hotel with the updated server:
-  `TWEEBBO_URL=ws://127.0.0.1:8092 node ../Tweebbo-Vercel/tests/device-announcement.mjs`.
+  `TWEEBBO_URL=ws://127.0.0.1:8092 node ../Tweebbo-Vercel/tests/device-announcement.mjs`, and the
+  desktop harness (`tools/host/run.sh`, see README) for a visual check of the same code.
 - Never log, show or commit player tokens (`token-*.txt`), private codes or production data.

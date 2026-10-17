@@ -13,7 +13,7 @@ It is the base to grow the full port (see `../Tweebbo-designs/PORTS-SHOWCASE-202
 - **Online**: WebSocket over TLS (mbedTLS) to `wss://tweebbo.lol` (or another server), protocol v6,
   with the same reconnection and renewal as the 3DS client. `HELLO` carries `platform = 1` plus
   the trailing device byte `2` (Switch).
-- **Room**: isometric rendering at integer zoom (2× by default, 1× with L), room background or
+- **Room**: isometric rendering at integer zoom (1× by default, the whole room; 2× with R), room background or
   layered public room, furniture with its own textures (LRU cache), avatars composed with the
   shared compositor, chat bubbles and the classic bottom bar.
 - **Showcase**: the five brand models (Bobba, Cyber, Director, Street, VIP Girl) rotate every
@@ -33,7 +33,7 @@ It is the base to grow the full port (see `../Tweebbo-designs/PORTS-SHOWCASE-202
 | X | Wave |
 | Y | Quick chat ("Hello from Nintendo Switch!") |
 | B | Next showcase model |
-| L / R | Zoom 1× / 2× |
+| L / R | Zoom 1× (whole room, default) / 2× (close-up) |
 | Minus (Select) | Offline simulation on/off |
 | Plus (Start) | Quit (HOME also works) |
 | Touch | Walk to the tapped tile |
@@ -87,3 +87,17 @@ romfs/             PNG assets fetched from the 3DS export (gfx/ and furni/)
 
 Build mode, catalogue, inventory, friends, pets, games, casino, Snow Storm, audio, in-game
 updates and the NSP forwarder stay on the roadmap of the ports document.
+
+## Desktop harness
+
+There is no usable Switch emulator without console keys, so `tools/host/run.sh` compiles the
+shipped sources (the shared core, `source/nx/gfx.c` and `source/nx/conn.c`) for Linux with a
+keyboard main (`tools/host/main.c`) and runs them headless under Xvfb in a container, saving a
+screenshot in `build/host/shot.png`:
+
+```bash
+SERVER=ws://127.0.0.1:8092 SHOT_MS=20000 tools/host/run.sh
+```
+
+Only the libnx calls (socket service, csrng, pad) differ from the console build.
+
