@@ -99,6 +99,8 @@ int main(int argc, char **argv) {
     if (down & HidNpadButton_Y) show_action(SHOW_Y);
     if (down & HidNpadButton_L) show_action(SHOW_L);
     if (down & HidNpadButton_R) show_action(SHOW_R);
+    if (down & HidNpadButton_ZL) show_action(SHOW_ZL);
+    if (down & HidNpadButton_ZR) show_action(SHOW_ZR);
     if (down & HidNpadButton_Minus) show_action(SHOW_OFFLINE);
     if ((down & HidNpadButton_Plus) && show_confirm_quit("+", now_ms())) running = false;
     walk_input(&pad, now_ms());

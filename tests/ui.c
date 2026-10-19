@@ -249,14 +249,17 @@ int main(void) {
   puts("OK: wardrobe save/cancel, chat drafts/UTF-8/history, reconnect guards, room API/error/reset, password clearing and control bounds.");
   state=NET_ONLINE;W.in_room=true;W.w=10;W.h=10;W.room_owner=true;W.guest_id=1;W.credits=100000;
   open_panel(MORE);check_bounds();check_pad_reachability();click(OPEN_SHOP,SHOP_CATALOGUE);
-  check_bounds();check_pad_reachability();click(SELECT_CATEGORY,0);check_bounds();check_pad_reachability();
-  int selected=0;while(selected<cat_offer_count && (!cat_offers[selected].available || !cat_offers[selected].amount))selected++;
-  assert(selected<cat_offer_count);client_shop_action(SELECT_OFFER,selected);check_bounds();check_pad_reachability();
+  check_bounds();check_pad_reachability();
+  int category=0;while(category<cat_page_count && strcmp(cat_pages[category].id,"6"))category++;
+  assert(category<cat_page_count);click(SELECT_CATEGORY,category);check_bounds();check_pad_reachability();
+  int offers[4096],offer_n=page_offers(offers,COUNT(offers)),selected=-1;
+  for(int i=0;i<offer_n;i++)if(cat_offers[offers[i]].available && cat_offers[offers[i]].amount){selected=offers[i];break;}
+  assert(selected>=0);client_shop_action(SELECT_OFFER,selected);check_bounds();check_pad_reachability();
   click(BUY,0);assert(purchases==1 && S.pending==BUY);client_shop_action(BUY,0);assert(purchases==1);
   client_shop_notice("Welcome to the hotel.");assert(S.pending==BUY);
   clock_ms=11000;client_shop_update();assert(S.timed_out && S.pending==BUY);client_shop_action(BUY,0);assert(purchases==1);
   W.inv[0]=(InvItem){500,cat_offers[selected].def};W.inv_n=1;client_shop_update();assert(!S.pending);
-  client_shop_open(SHOP_INVENTORY);check_bounds();check_pad_reachability();click(SELECT_OWNED,500);check_bounds();check_pad_reachability();
+  client_shop_open(SHOP_INVENTORY);check_bounds();check_pad_reachability();click(PICK_OWNED,500);check_bounds();check_pad_reachability();
   W.inv[0].def=1;click(PLACE,0);assert(S.ghost.on);check_bounds();
   client_shop_tile(4,4);assert(S.ghost.ok);client_ui_action(SHOW_A);assert(placements==1 && S.pending);
   client_ui_action(SHOW_A);client_ui_action(SHOW_B);assert(placements==1 && S.ghost.on);
@@ -329,9 +332,9 @@ int main(void) {
   strcpy(U.input,"CHAIR");click(SUBMIT,0);assert(S.category==-1 && U.panel==SHOP);
   int results[4096],found=page_offers(results,COUNT(results));assert(found>0);
   for(int i=0;i<found;i++)assert(matches(cat_offers[results[i]].name,"chair") || matches(cat_offers[results[i]].desc,"chair"));
-  check_bounds();check_pad_reachability();click(BACK,0);click(SEARCH_OFFERS,0);
+  check_bounds();check_pad_reachability();click(CLEAR_QUERY,0);click(SEARCH_OFFERS,0);
   strcpy(U.input,"no-match-furniture-abcdef");click(SUBMIT,0);assert(!page_offers(results,COUNT(results)));check_bounds();check_pad_reachability();
-  click(BACK,0);click(SEARCH_OFFERS,0);strcpy(U.input,"cancelled");click(CLOSE,0);assert(strcmp(S.query,"cancelled"));
+  click(CLEAR_QUERY,0);click(SEARCH_OFFERS,0);strcpy(U.input,"cancelled");click(CLOSE,0);assert(strcmp(S.query,"cancelled"));
   const FurniDef *dispenser=NULL,*dice=NULL,*seat=NULL,*toggle=NULL;
   for(int i=0;i<furni_def_count;i++) {
     int ids[32];const FurniDef *d=&furni_defs[i];

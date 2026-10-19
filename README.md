@@ -28,6 +28,12 @@ The room shows a small button legend in the top-left corner.
 - **Y**: chat · **X**: wave · **B**: rooms or close
 - **L/R**: room zoom · **+**: quit
 
+In the Navigator and the large furniture windows:
+
+- **D-pad**: move · **A**: choose or place · **B**: close or cancel
+- **L/R**: turn pages, or rotate and change height while placing
+- **ZL/ZR**: change catalogue section; in the Navigator, also turn pages
+
 ## Updates
 
 When you enter the hotel, Tweebbo checks GitHub for a newer release and offers **Update now**. The
