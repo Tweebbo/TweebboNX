@@ -120,6 +120,21 @@ int main(int argc, char **argv) {
     static bool pressed;
     const char *press = getenv("OFFLINE_MS");
     if (press && *press && !pressed && now - start >= (u64)atoll(press)) { pressed = true; dbg_log("host: Minus pressed"); show_action(SHOW_OFFLINE); }
+    /* Test hook: WALK_TO="x,y" walks one step toward that room tile every 220 ms. */
+    const char *walkto = getenv("WALK_TO");
+    static u64 next_walk;
+    if (walkto && *walkto && now >= next_walk) {
+      int tx, ty;
+      if (sscanf(walkto, "%d,%d", &tx, &ty) == 2) {
+        Ent *me = world_ent(W.me);
+        if (me) {
+          int dx = tx > me->x ? 1 : tx < me->x ? -1 : 0;
+          int dy = ty > me->y ? 1 : ty < me->y ? -1 : 0;
+          if (dx || dy) show_walk(dx, dy);
+          next_walk = now + 220;
+        }
+      }
+    }
     /* Test hook: TAP_XY="x,y" TAP_MS=ms taps a control once (also the HUD chips pill). */
     const char *tapxy = getenv("TAP_XY"), *tapms = getenv("TAP_MS");
     static bool tapped;

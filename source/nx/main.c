@@ -15,6 +15,7 @@
 #include "client_pool.h"
 #include "client_ui.h"
 #include "world.h"
+#include "update.h"
 
 void store_start(void);
 void store_stop(void);
@@ -49,6 +50,7 @@ static void walk_input(PadState *pad, u64 now) {
 }
 
 int main(int argc, char **argv) {
+  update_set_launch_path(argc > 0 ? argv[0] : NULL);
   log_start();
   store_start();
   if (R_FAILED(romfsInit())) {
@@ -109,6 +111,7 @@ int main(int argc, char **argv) {
     u64 now = now_ms();
     net_update(now);
     client_ui_update();
+    if (update_exit_requested()) running = false;
     gfx_begin();
     show_frame(now_ms());
     gfx_present();

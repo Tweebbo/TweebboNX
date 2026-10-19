@@ -63,6 +63,9 @@ bool net_online(void) { return state==NET_ONLINE; }
 const char *net_server(void) { return server; }
 const char *show_platform(void) { return "Nintendo Switch"; }
 void show_device_badge(int device,float x,float y,float k) {(void)x;(void)y;(void)k;assert(device>=1 && device<=3);}
+void dbg_log(const char *fmt, ...) {(void)fmt;}
+int http_download(const char *url,HttpSink sink,void *ctx,long *total,char *err,int cap){(void)url;(void)sink;(void)ctx;(void)total;if(err&&cap)err[0]=0;return 0;}
+int http_download_from(const char *url,long from,HttpSink sink,void *ctx,long *total,char *err,int cap){(void)url;(void)from;(void)sink;(void)ctx;(void)total;if(err&&cap)err[0]=0;return 0;}
 int net_http(const char *m,const char *p,const char *j,bool auth) {
   if(!strncmp(p,"/api/badges?guest=",18)||!strcmp(p,"/api/identity")||!strcmp(p,"/api/owner-profile")||!strncmp(p,"/static/trax/3ds/",17))return ++request_id;
   if(!auth && !strncmp(p,"/static/consoles/",17))return ++request_id;
@@ -104,6 +107,8 @@ void gfx_sprite_xy(int p,int sx,int sy,int sw,int sh,float x,float y,float kx,fl
 }
 void fill_round(float x,float y,float w,float h,float r,u32 c) { (void)x;(void)y;(void)w;(void)h;(void)r;(void)c; }
 void fill_circle(float cx,float cy,float r,u32 c) { (void)cx;(void)cy;(void)r;(void)c; }
+void draw_line(float x0,float y0,float x1,float y1,u32 c) { (void)x0;(void)y0;(void)x1;(void)y1;(void)c; }
+void fill_triangle(float x0,float y0,float x1,float y1,float x2,float y2,u32 c) { (void)x0;(void)y0;(void)x1;(void)y1;(void)x2;(void)y2;(void)c; }
 static void click(int cmd,int arg) {
   client_ui_draw();
   for(int i=0;i<U.count;i++)if(U.buttons[i].cmd==cmd && U.buttons[i].arg==arg) {
