@@ -1,5 +1,5 @@
 #---------------------------------------------------------------------------------
-# Tweebbo for Nintendo Switch (showcase proof of concept).
+# Tweebbo for Nintendo Switch (development port).
 # Build with ./build.sh (uses the devkitpro/devkita64 container).
 #---------------------------------------------------------------------------------
 .SUFFIXES:
@@ -14,25 +14,28 @@ include $(DEVKITPRO)/libnx/switch_rules
 
 TARGET      :=  tweebbo
 BUILD       :=  build
-SOURCES     :=  source source/gen source/nx
-INCLUDES    :=  source
+SOURCES     :=  source source/gen source/nx vendor/quickjs vendor/qrcodegen
+INCLUDES    :=  source vendor/quickjs
 ROMFS       :=  romfs
-APP_TITLE   :=  Tweebbo Showcase
+APP_TITLE   :=  Tweebbo
 APP_AUTHOR  :=  Tweebbo
 APP_VERSION :=  $(shell cat $(TOPDIR)/VERSION)
 
 ARCH    :=  -march=armv8-a+crc+crypto -mtune=cortex-a57 -mtp=soft -fPIE
-CFLAGS  :=  -g -Wall -O2 -ffunction-sections $(ARCH) $(DEFINES)
+CFLAGS  :=  -g -Wall -O2 -ffunction-sections -fwrapv -fno-strict-aliasing $(ARCH) $(DEFINES)
 CFLAGS  +=  $(INCLUDE) -D__SWITCH__ -D_GNU_SOURCE -DCONFIG_VERSION='"2026-06-04"'
 CFLAGS  +=  -DAPP_VERSION='"$(APP_VERSION)"' -DTWEEBBO_DEVICE=2
-# The hotel on the local network this proof of concept plays on (set by build.sh).
-CFLAGS  +=  -DTWEEBBO_LAN_ONLY=1 -DDEFAULT_SERVER='"$(TWEEBBO_SERVER)"' 
+# The hotel the client plays on (set by build.sh: tweebbo.lol, or a LAN hotel for showcases).
+CFLAGS  +=  -DDEFAULT_SERVER='"$(TWEEBBO_SERVER)"'
+ifeq ($(TWEEBBO_LAN_ONLY),1)
+CFLAGS  +=  -DTWEEBBO_LAN_ONLY=1
+endif
 CXXFLAGS := $(CFLAGS) -fno-rtti -fno-exceptions
 
 ASFLAGS :=  -g $(ARCH)
 LDFLAGS  =  -specs=$(DEVKITPRO)/libnx/switch.specs -g $(ARCH) -Wl,-Map,$(notdir $*.map)
 
-LIBS    :=  -lSDL2_image -lSDL2 -lEGL -ldrm_nouveau -lGLESv2 -lglapi -lstdc++ -lmbedtls -lmbedx509 -lmbedcrypto -lwebp -lpng16 -ljpeg -lz -lnx -lm
+LIBS    :=  -lSDL2_image -lSDL2 -lEGL -ldrm_nouveau -lGLESv2 -lglapi -lstdc++ -lmbedtls -lmbedx509 -lmbedcrypto -ljansson -lwebp -lpng16 -ljpeg -lz -lnx -lm
 
 LIBDIRS :=  $(PORTLIBS) $(LIBNX)
 
@@ -75,7 +78,9 @@ DEPENDS := $(OFILES:.o=.d)
 
 all: $(OUTPUT).nro
 
-$(OUTPUT).nro: $(OUTPUT).elf $(OUTPUT).nacp
+$(OFILES): $(TOPDIR)/VERSION
+$(OUTPUT).nacp: $(TOPDIR)/VERSION
+$(OUTPUT).nro: $(OUTPUT).elf $(OUTPUT).nacp $(wildcard $(TOPDIR)/romfs/gfx/*.png $(TOPDIR)/romfs/furni/*.png)
 
 $(OUTPUT).elf: $(OFILES)
 

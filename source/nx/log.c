@@ -7,14 +7,15 @@
 #include <string.h>
 #include <sys/stat.h>
 #include <pthread.h>
-#include <switch.h>
+#include <time.h>
 #include "common.h"
 
-#define LOG_RING 256 * 1024
+#define LOG_RING (256 * 1024)
 
 static char ring[LOG_RING];
-static volatile int head, tail;
-static bool started;
+static int head, tail;
+static bool started, stopping;
+static pthread_t worker;
 static pthread_mutex_t mu = PTHREAD_MUTEX_INITIALIZER;
 static void *drain_thread(void *arg);
 
@@ -22,10 +23,17 @@ extern bool store_log_available(void);
 
 void log_start(void) {
   if (started) return;
-  started = true;
-  pthread_t t;
-  pthread_create(&t, NULL, drain_thread, NULL);
-  pthread_detach(t);
+  stopping = false;
+  started = pthread_create(&worker, NULL, drain_thread, NULL) == 0;
+}
+
+void log_stop(void) {
+  if (!started) return;
+  pthread_mutex_lock(&mu);
+  stopping = true;
+  pthread_mutex_unlock(&mu);
+  pthread_join(worker, NULL);
+  started = false;
 }
 
 void dbg_log(const char *fmt, ...) {
@@ -35,11 +43,15 @@ void dbg_log(const char *fmt, ...) {
   int n = vsnprintf(line, sizeof line - 2, fmt, ap);
   va_end(ap);
   if (n < 0) return;
+  if (n >= (int)sizeof line - 2) n = (int)sizeof line - 3;
   line[n++] = '\n';
   pthread_mutex_lock(&mu);
+  if (n > (tail - head - 1 + LOG_RING) % LOG_RING) {
+    pthread_mutex_unlock(&mu);
+    return;
+  }
   for (int i = 0; i < n; i++) {
     int next = (head + 1) % LOG_RING;
-    if (next == tail) break; /* overrun: drop the line */
     ring[head] = line[i];
     head = next;
   }
@@ -51,14 +63,17 @@ static void *drain_thread(void *arg) {
   static char chunk[8192];
   bool opened = false;
   for (;;) {
-    svcSleepThread(500 * 1000 * 1000ull); /* 500 ms */
+    struct timespec delay = {.tv_nsec = 50 * 1000 * 1000};
+    nanosleep(&delay, NULL);
     pthread_mutex_lock(&mu);
     int n = 0;
     while (n < (int)sizeof chunk && tail != head) {
       chunk[n++] = ring[tail];
       tail = (tail + 1) % LOG_RING;
     }
+    bool done = stopping && head == tail;
     pthread_mutex_unlock(&mu);
+    if (!n && done) break;
     if (!n) continue;
     if (!store_log_available()) continue;
     if (!opened) {

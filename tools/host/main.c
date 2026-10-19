@@ -4,6 +4,7 @@
 // against a hotel on this PC; it is not a product.
 //   Keys: arrows walk, Z = A, X = B, A = X, S = Y, Q/W = L/R, O = Minus (offline), Escape quits.
 #include <SDL.h>
+#include <assert.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -14,7 +15,11 @@
 #include "common.h"
 #include "gfx.h"
 #include "net.h"
+#include "proto.h"
 #include "show.h"
+#include "client_ui.h"
+#include "client_shop.h"
+#include "pets.h"
 #include "world.h"
 
 void gfx_screenshot(const char *path);
@@ -69,20 +74,25 @@ void store_save(const char *key, const char *value) {
   fclose(f);
 }
 
+#include "ui-exercise.h"
+
 int main(int argc, char **argv) {
   if (argc > 1) data_dir = argv[1];
   mkdir(data_dir, 0777);
   srand((unsigned)now_ms());
   if (!gfx_init()) return 1;
-  show_set_platform("Nintendo Switch", "Hello from Nintendo Switch!");
+  show_set_platform(TWEEBBO_DEVICE==3 ? "PlayStation Vita" : "Nintendo Switch", "Hello from the hotel!");
   show_set_offline_key("O");
   char neterr[128];
   conn_global_init(neterr, sizeof neterr);
   net_start(now_ms());
   show_start(now_ms());
   const char *shot = getenv("SHOT"), *shot_ms = getenv("SHOT_MS"), *quit_ms = getenv("QUIT_MS");
+  char selected_hotel[128];
+  snprintf(selected_hotel, sizeof selected_hotel, "%s", net_server());
   u64 start = now_ms(), next_step = 0;
   bool running = true, shot_done = false;
+  u64 frames = 0, previous_frame = start, longest_frame = 0;
   while (running) {
     SDL_Event ev;
     while (SDL_PollEvent(&ev)) {
@@ -110,17 +120,67 @@ int main(int argc, char **argv) {
     static bool pressed;
     const char *press = getenv("OFFLINE_MS");
     if (press && *press && !pressed && now - start >= (u64)atoll(press)) { pressed = true; dbg_log("host: Minus pressed"); show_action(SHOW_OFFLINE); }
+    /* Test hook: TAP_XY="x,y" TAP_MS=ms taps a control once (also the HUD chips pill). */
+    const char *tapxy = getenv("TAP_XY"), *tapms = getenv("TAP_MS");
+    static bool tapped;
+    if (tapxy && tapms && !tapped && now - start >= (u64)atoll(tapms)) {
+      int tx, ty; tapped = true;
+      if (sscanf(tapxy, "%d,%d", &tx, &ty) == 2) { dbg_log("host: tap %d,%d", tx, ty); client_ui_tap((float)tx, (float)ty); }
+    }
+    /* Test hook: TAPS="ms:x,y;ms:x,y..." taps several controls in order. */
+    const char *taps = getenv("TAPS");
+    static int tap_done;
+    if (taps && *taps) {
+      const char *p = taps; int i = 0, ms, tx, ty;
+      while (p && sscanf(p, "%d:%d,%d", &ms, &tx, &ty) == 3) {
+        if (i == tap_done && now - start >= (u64)ms) { tap_done++; dbg_log("host: tap %d,%d", tx, ty); client_ui_tap((float)tx, (float)ty); break; }
+        i++; p = strchr(p, ';'); if (p) p++;
+      }
+    }
+    if (getenv("EXERCISE") && *getenv("EXERCISE")) {
+      static unsigned step;
+      static const int actions[] = {SHOW_A, SHOW_B, SHOW_X, SHOW_Y, SHOW_R, SHOW_L, SHOW_OFFLINE, SHOW_OFFLINE};
+      if (step < sizeof actions / sizeof *actions && now - start >= 2000 + step * 1000) {
+        dbg_log("host: exercise action %u at %llu ms", step, (unsigned long long)(now - start));
+        show_action(actions[step++]);
+        if (step == 8) assert(!strcmp(net_server(), selected_hotel));
+      }
+    }
     net_update(now);
+    client_ui_update();
+    soak_exercise(now-start);
+    const char *ui_shot=ui_exercise(now-start);
+    const char *pad_shot=pad_exercise(now-start);
+    if(pad_shot)ui_shot=pad_shot;
     gfx_frame();
     gfx_begin();
     show_frame(now_ms());
+    if(ui_shot) {
+      char path[96];snprintf(path,sizeof path,"ui-%d-%s.png",TWEEBBO_DEVICE,ui_shot);gfx_screenshot(path);
+    }
     if (shot && !shot_done && shot_ms && now - start >= (u64)atoll(shot_ms)) {
       shot_done = true;
       gfx_screenshot(shot);
     }
+    if(ui_exercise_done){if(shot && !shot_done)gfx_screenshot(shot);running=false;}
     gfx_present();
+    u64 finished = now_ms();
+    if (finished - previous_frame > longest_frame) longest_frame = finished - previous_frame;
+    previous_frame = finished;
+    frames++;
     if (quit_ms && now - start >= (u64)atoll(quit_ms)) running = false;
     if (show_quit_requested()) running = false;
+  }
+  dbg_log("host: finished in %llu ms, %llu frames, longest frame %llu ms, state=%d, in_room=%d",
+          (unsigned long long)(now_ms() - start), (unsigned long long)frames,
+          (unsigned long long)longest_frame, net_state(), W.in_room);
+  Ent *me = world_ent(W.me);
+  dbg_log("host: local device=%u", me ? me->device : 0);
+  if(getenv("UI_EXERCISE") && (!strcmp(getenv("UI_EXERCISE"),"casino") || !strcmp(getenv("UI_EXERCISE"),"snow") || !strcmp(getenv("UI_EXERCISE"),"snow-online") || !strcmp(getenv("UI_EXERCISE"),"final")))assert(ui_exercise_done);
+  json_decref(host_casino);host_casino=NULL;json_decref(host_activity);json_decref(host_bar);json_decref(host_music);
+  if(getenv("UI_EXERCISE")&&!strcmp(getenv("UI_EXERCISE"),"final-music"))assert(ui_exercise_done);
+  if (getenv("EXERCISE") && *getenv("EXERCISE")) {
+    assert(net_online() && me && me->device == DEVICE_SWITCH);
   }
   net_stop();
   conn_global_exit();

@@ -52,6 +52,7 @@ static struct {
 static pthread_mutex_t tls_lock = PTHREAD_MUTEX_INITIALIZER;
 #define TLS_LOCK() pthread_mutex_lock(&tls_lock)
 #define TLS_UNLOCK() pthread_mutex_unlock(&tls_lock)
+extern bool net_cancelled(void);
 static bool sockets_ready;
 bool conn_ready(void) { return sockets_ready; }
 
@@ -182,8 +183,31 @@ Conn *conn_open(const Endpoint *ep, int timeout_ms, char *err, int err_cap) {
   }
   int fd = socket(AF_INET, SOCK_STREAM, IPPROTO_IP);
   if (fd < 0) { freeaddrinfo(res); snprintf(err, (size_t)err_cap, "No network (socket error %d).", errno); return NULL; }
-  // Blocking connect: the network thread can wait; drawing continues on the main thread.
+  int flags = fcntl(fd, F_GETFL, 0);
+  if (flags < 0 || fcntl(fd, F_SETFL, flags | O_NONBLOCK) < 0) {
+    freeaddrinfo(res);
+    close(fd);
+    snprintf(err, (size_t)err_cap, "Could not configure the network socket.");
+    return NULL;
+  }
   int r = connect(fd, res->ai_addr, res->ai_addrlen);
+  if (r < 0 && would_block()) {
+    u64 deadline = now_ms() + (u64)(timeout_ms > 0 ? timeout_ms : 0);
+    while (!net_cancelled() && now_ms() < deadline) {
+      u64 now = now_ms();
+      if (now >= deadline) break;
+      int remain = (int)(deadline - now);
+      if (!wait_fd(fd, POLLOUT, remain < 50 ? remain : 50)) continue;
+      int error = 0;
+      socklen_t size = sizeof error;
+      if (getsockopt(fd, SOL_SOCKET, SO_ERROR, &error, &size) < 0) break;
+      if (error) errno = error;
+      else r = 0;
+      break;
+    }
+    if (r < 0 && net_cancelled()) errno = ECANCELED;
+    else if (r < 0 && now_ms() >= deadline) errno = ETIMEDOUT;
+  }
   freeaddrinfo(res);
   if (r < 0) {
     int e = errno;
@@ -191,8 +215,7 @@ Conn *conn_open(const Endpoint *ep, int timeout_ms, char *err, int err_cap) {
     snprintf(err, (size_t)err_cap, "Could not reach %s:%d (error %d). Same Wi-Fi as the server?", ep->host, ep->port, e);
     return NULL;
   }
-  fcntl(fd, F_SETFL, fcntl(fd, F_GETFL, 0) | O_NONBLOCK);
-  (void)timeout_ms;
+  if (net_cancelled()) { close(fd); snprintf(err, (size_t)err_cap, "Connection cancelled."); return NULL; }
 #ifndef NO_TLS
   if (ep->tls) {
     TLS_LOCK();
@@ -202,6 +225,7 @@ Conn *conn_open(const Endpoint *ep, int timeout_ms, char *err, int err_cap) {
   }
 #endif
   Conn *c = calloc(1, sizeof *c);
+  if (!c) { close(fd); snprintf(err, (size_t)err_cap, "Not enough memory for the connection."); return NULL; }
   c->fd = fd;
   c->tls = ep->tls;
   if (!c->tls) return c;
@@ -215,6 +239,7 @@ Conn *conn_open(const Endpoint *ep, int timeout_ms, char *err, int err_cap) {
   mbedtls_ssl_set_bio(&c->ssl, c, bio_send, bio_recv, NULL);
   int spent = 0;
   for (;;) {
+    if (net_cancelled()) { conn_close(c); return NULL; }
     r = mbedtls_ssl_handshake(&c->ssl);
     if (!r) break;
     if ((r != MBEDTLS_ERR_SSL_WANT_READ && r != MBEDTLS_ERR_SSL_WANT_WRITE) || spent > timeout_ms) {
@@ -251,6 +276,7 @@ bool conn_write(Conn *c, const void *data, int len, int timeout_ms) {
   const u8 *p = data;
   int spent = 0;
   while (len > 0) {
+    if (net_cancelled()) return false;
     int n;
 #ifndef NO_TLS
     if (c->tls) {
@@ -269,6 +295,7 @@ bool conn_write(Conn *c, const void *data, int len, int timeout_ms) {
       spent += 50;
       continue;
     }
+    if (n == 0) return false;
     p += n;
     len -= n;
   }
@@ -276,6 +303,7 @@ bool conn_write(Conn *c, const void *data, int len, int timeout_ms) {
 }
 
 int conn_read(Conn *c, void *buf, int cap, int timeout_ms) {
+  if (net_cancelled()) return -1;
 #ifndef NO_TLS
   if (c->tls && mbedtls_ssl_get_bytes_avail(&c->ssl) == 0 && !wait_fd(c->fd, POLLIN, timeout_ms)) return 0;
   if (c->tls) {

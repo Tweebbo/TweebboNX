@@ -10,3 +10,5 @@ romfs/furni/
 romfs/classic/
 source/gen/
 __pycache__/
+romfs/snow/
+romfs/spaces/

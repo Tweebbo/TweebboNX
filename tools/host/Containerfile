@@ -1,6 +1,6 @@
 # Desktop harness of the Switch client (SDL2 + mbedTLS), headless under Xvfb.
 FROM docker.io/library/ubuntu:24.04
 RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
-      build-essential libsdl2-dev libsdl2-image-dev libmbedtls-dev xvfb ca-certificates \
+      build-essential libsdl2-dev libsdl2-image-dev libmbedtls-dev libjansson-dev xvfb ca-certificates \
       libgl1-mesa-dri libegl1 \
     && rm -rf /var/lib/apt/lists/*

@@ -1,6 +1,8 @@
 // Tweebbo Switch graphics: SDL2/OpenGL ES with integer scaling and nearest filtering.
 // Implements the gfx.h contract (ABGR colors, LRU furniture cache, room pages).
 #include "gfx.h"
+#include "audio.h"
+#include "gen/snow_assets.h"
 #include <SDL.h>
 #include <SDL_image.h>
 #include <math.h>
@@ -9,14 +11,20 @@
 #include <string.h>
 #include "common.h"
 #include "world.h"
+#include "finishes.h"
+#include "client_shop.h"
 
-#define ATLAS_PAGES 5
-#define FURNI_CACHE 512 /* never evict inside a busy room: a miss decodes a PNG mid-frame */
+#define ATLAS_MAX 16
+#define FURNI_CACHE 512
+#define FURNI_BYTES (64u * 1024 * 1024)
 
 static SDL_Window *win;
 static SDL_Renderer *ren;
-static SDL_Texture *atlas[ATLAS_PAGES];
+static SDL_Texture *atlas[ATLAS_MAX];
 static SDL_Texture *font_tex;
+static SDL_Texture *pet_tex[32];
+static float view_x,view_y,view_kx=1,view_ky=1;
+void gfx_sprite_transform(float x,float y,float kx,float ky){view_x=x;view_y=y;view_kx=kx;view_ky=ky;}
 static bool linear_filter, additive;
 static int win_w = 1280, win_h = 720;
 
@@ -27,30 +35,55 @@ static struct {
   SDL_Texture *tex[4];
   const RoomBackground *bg;
   int pages;
+  char wall[9], floor[9];
+  bool finish_attempted;
 } room;
+static void room_finish(void);
 static struct {
   SDL_Texture *tex[4];
   const Scene *scene;
   int pages;
 } scene_v;
 
-typedef struct { u16 def; u8 page; bool used; SDL_Texture *tex; u32 stamp; } FurniTex;
+typedef struct { u16 def; u8 page; bool used; SDL_Texture *tex; u32 stamp; size_t bytes; } FurniTex;
 static FurniTex furni_cache[FURNI_CACHE];
 static u32 furni_clock;
+static size_t furni_bytes;
+
+static void furni_evict(FurniTex *slot) {
+  if (slot->tex) SDL_DestroyTexture(slot->tex);
+  furni_bytes -= slot->bytes;
+  memset(slot, 0, sizeof *slot);
+}
 
 static SDL_Texture *furni_get(u16 def, int page) {
   FurniTex *slot = NULL, *victim = &furni_cache[0];
   for (int i = 0; i < FURNI_CACHE; i++) {
     FurniTex *c = &furni_cache[i];
     if (c->used && c->def == def && c->page == page) { slot = c; break; }
-    if (!victim->used || victim->stamp > c->stamp) victim = c;
+    if (victim->used && (!c->used || c->stamp < victim->stamp)) victim = c;
   }
   if (!slot) {
     char path[64];
     snprintf(path, sizeof path, "romfs:/furni/d%u_%d.png", def, page);
     slot = victim;
-    if (slot->tex) SDL_DestroyTexture(slot->tex);
+    furni_evict(slot);
     slot->tex = load_png(path);
+    if (slot->tex) {
+      int w, h;
+      SDL_QueryTexture(slot->tex, NULL, NULL, &w, &h);
+      slot->bytes = (size_t)w * h * 4;
+      while (furni_bytes + slot->bytes > FURNI_BYTES && furni_bytes) {
+        FurniTex *oldest = NULL;
+        for (int i = 0; i < FURNI_CACHE; i++) {
+          FurniTex *c = &furni_cache[i];
+          if (c != slot && c->used && c->bytes && (!oldest || c->stamp < oldest->stamp)) oldest = c;
+        }
+        if (!oldest) break;
+        furni_evict(oldest);
+      }
+      furni_bytes += slot->bytes;
+    }
     if (!slot->tex) dbg_log("furniture texture missing: %s", path);
     slot->def = def;
     slot->page = (u8)page;
@@ -99,7 +132,7 @@ bool gfx_init(void) {
     return false;
   }
   SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "0");
-  win = SDL_CreateWindow("Tweebbo Showcase", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 1280, 720,
+  win = SDL_CreateWindow("Tweebbo", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 1280, 720,
                          SDL_WINDOW_FULLSCREEN_DESKTOP | SDL_WINDOW_ALLOW_HIGHDPI);
   if (!win) { dbg_log("CreateWindow failed: %s", SDL_GetError()); return false; }
   SDL_GetWindowSize(win, &win_w, &win_h);
@@ -109,23 +142,30 @@ bool gfx_init(void) {
   SDL_RenderSetIntegerScale(ren, SDL_TRUE);
   SDL_SetRenderDrawBlendMode(ren, SDL_BLENDMODE_BLEND);
 
-  static const char *pages[ATLAS_PAGES] = {"atlas0", "atlasg0", "atlasg1", "atlasg2", "atlasg3"};
-  for (int i = 0; i < ATLAS_PAGES; i++) {
+  // The export decides the atlas pages (atlas0..N in RGBA8, atlasg0..N in LA8).
+  for (int i = 0; i < atlas_page_count && i < ATLAS_MAX; i++) {
     char path[64];
-    snprintf(path, sizeof path, "romfs:/gfx/%s.png", pages[i]);
+    snprintf(path, sizeof path, "romfs:/gfx/%s.png", atlas_page_files[i]);
     atlas[i] = load_png(path);
-    if (!atlas[i] && i == 0) return false;
+    if (!atlas[i]) return false;
   }
   font_tex = load_png("romfs:/gfx/font0.png");
+  if (!font_tex) return false;
   dbg_log("gfx ready: %dx%d logical %dx%d", win_w, win_h, SCREEN_W, SCREEN_H);
   return true;
 }
 
 void gfx_exit(void) {
-  for (int i = 0; i < ATLAS_PAGES; i++) if (atlas[i]) SDL_DestroyTexture(atlas[i]);
+  audio_exit();
+  gfx_snow_free();
+  for(int i=0;i<COUNT(pet_tex);i++)if(pet_tex[i]){SDL_DestroyTexture(pet_tex[i]);pet_tex[i]=NULL;}
+  for (int i = 0; i < ATLAS_MAX; i++) if (atlas[i]) SDL_DestroyTexture(atlas[i]);
   if (font_tex) SDL_DestroyTexture(font_tex);
   gfx_room_release();
   for (int i = 0; i < 4; i++) if (scene_v.tex[i]) { SDL_DestroyTexture(scene_v.tex[i]); scene_v.tex[i] = NULL; }
+  for (int i = 0; i < FURNI_CACHE; i++) {
+    furni_evict(&furni_cache[i]);
+  }
   if (ren) SDL_DestroyRenderer(ren);
   if (win) SDL_DestroyWindow(win);
   IMG_Quit();
@@ -133,7 +173,7 @@ void gfx_exit(void) {
 }
 
 void gfx_frame(void) {
-  /* The furniture cache is released when a room changes (like the 3DS LRU budget). */
+  room_finish();
 }
 
 void gfx_begin(void) {
@@ -145,6 +185,10 @@ void gfx_present(void) { SDL_RenderPresent(ren); }
 
 static void draw_tex(SDL_Texture *t, int sx, int sy, int sw, int sh, float x, float y, float kx, float ky, bool flip, u32 color) {
   if (!t) return;
+  x=view_x+x*view_kx;y=view_y+y*view_ky;kx*=view_kx;ky*=view_ky;
+  bool flip_y=ky<0;
+  if(kx<0){x+=sw*kx;kx=-kx;flip=!flip;}
+  if(ky<0){y+=sh*ky;ky=-ky;}
   u8 r, g, b, a;
   tex_color(color, &r, &g, &b, &a);
   if (r != 255 || g != 255 || b != 255) SDL_SetTextureColorMod(t, r, g, b);
@@ -155,27 +199,36 @@ static void draw_tex(SDL_Texture *t, int sx, int sy, int sw, int sh, float x, fl
   else SDL_SetTextureBlendMode(t, SDL_BLENDMODE_BLEND);
   SDL_Rect src = {sx, sy, sw, sh};
   SDL_FRect dst = {x, y, sw * kx, sh * ky};
-  SDL_RenderCopyExF(ren, t, &src, &dst, 0, NULL, flip ? SDL_FLIP_HORIZONTAL : SDL_FLIP_NONE);
+  SDL_RenderCopyExF(ren, t, &src, &dst, 0, NULL, (SDL_RendererFlip)((flip?SDL_FLIP_HORIZONTAL:0)|(flip_y?SDL_FLIP_VERTICAL:0)));
 }
 
 void gfx_sprite(int page, int sx, int sy, int sw, int sh, float x, float y, float scale, bool flip, u32 color) {
-  if (page < 0 || page >= ATLAS_PAGES) return;
+  if (page < 0 || page >= atlas_page_count || !atlas[page]) return;
   draw_tex(atlas[page], sx, sy, sw, sh, x, y, scale, scale, flip, color);
 }
 
 void gfx_sprite_xy(int page, int sx, int sy, int sw, int sh, float x, float y, float kx, float ky, bool flip, u32 color) {
-  if (page < 0 || page >= ATLAS_PAGES) return;
+  if (page < 0 || page >= atlas_page_count || !atlas[page]) return;
   draw_tex(atlas[page], sx, sy, sw, sh, x, y, kx, ky, flip, color);
 }
 
 void gfx_sprite_solid(int page, int sx, int sy, int sw, int sh, float x, float y, float kx, float ky, bool flip, u32 color) {
   /* Approximate silhouette: the same sprite multiplied by the veil color. */
-  if (page < 0 || page >= ATLAS_PAGES) return;
+  if (page < 0 || page >= atlas_page_count || !atlas[page]) return;
   draw_tex(atlas[page], sx, sy, sw, sh, x, y, kx, ky, flip, color);
 }
 
 void gfx_font_sprite(int sx, int sy, int sw, int sh, float x, float y, bool flip, u32 color) {
   draw_tex(font_tex, sx, sy, sw, sh, x, y, 1, 1, flip, color);
+}
+void gfx_pet_preload(int palette) {
+  if(palette<0 || palette>=pet_palette_count || palette>=COUNT(pet_tex) || pet_tex[palette])return;
+  char path[64];snprintf(path,sizeof path,"romfs:/gfx/pets_%d.png",palette);pet_tex[palette]=load_png(path);
+}
+void gfx_pet(int palette,const PetPart *part,float x,float y,float scale,bool flip,u32 color,bool solid) {
+  (void)solid;
+  if(palette<0 || palette>=COUNT(pet_tex))return;
+  draw_tex(pet_tex[palette],part->x,part->y,part->w,part->h,x,y,scale,scale,flip,color);
 }
 
 const RoomBackground *gfx_room(const char *model) {
@@ -202,6 +255,29 @@ void gfx_room_release(void) {
   for (int i = 0; i < 4; i++) if (room.tex[i]) { SDL_DestroyTexture(room.tex[i]); room.tex[i] = NULL; }
   room.bg = NULL;
   room.pages = 0;
+  room.finish_attempted=false;
+}
+
+static void room_finish(void) {
+  const char *wall=client_shop_wall(),*floor=client_shop_floor();
+  if(!room.bg || (room.finish_attempted && !strcmp(room.wall,wall) && !strcmp(room.floor,floor)))return;
+  SDL_Texture *next[4]={0};bool ok=true;
+  for(int i=0;i<room.pages && ok;i++) {
+    char path[96];snprintf(path,sizeof path,"romfs:/gfx/%s.png",room.bg->tiles[i].file);
+    SDL_Surface *raw=IMG_Load(path),*s=raw?SDL_ConvertSurfaceFormat(raw,SDL_PIXELFORMAT_RGBA32,0):NULL;
+    if(raw)SDL_FreeSurface(raw);
+    ok=s && finishes_paint("romfs:/spaces",room.bg,i,wall,floor,s->pixels,s->w,s->h,s->pitch);
+    if(ok) {next[i]=SDL_CreateTextureFromSurface(ren,s);ok=next[i]!=NULL;}
+    if(s)SDL_FreeSurface(s);
+    if(next[i]) {SDL_SetTextureBlendMode(next[i],SDL_BLENDMODE_BLEND);SDL_SetTextureScaleMode(next[i],SDL_ScaleModeNearest);}
+  }
+  for(int i=0;i<room.pages;i++) {
+    if(ok) {SDL_DestroyTexture(room.tex[i]);room.tex[i]=next[i];}
+    else if(next[i])SDL_DestroyTexture(next[i]);
+  }
+  if(!ok)dbg_log("room finishes unavailable: %s",room.bg->model);
+  snprintf(room.wall,sizeof room.wall,"%s",wall);snprintf(room.floor,sizeof room.floor,"%s",floor);
+  room.finish_attempted=true;
 }
 
 void gfx_room_draw(const RoomBackground *bg, float x, float y, float scale) {
@@ -218,7 +294,7 @@ const Scene *gfx_scene(const char *model) {
   if (want == scene_v.scene) return want;
   for (int i = 0; i < 4; i++) if (scene_v.tex[i]) { SDL_DestroyTexture(scene_v.tex[i]); scene_v.tex[i] = NULL; }
   scene_v.scene = NULL;
-  if (!want) return NULL;
+  if (!want || want->pages > 4) return NULL;
   for (int i = 0; i < want->pages && i < 4; i++) {
     char path[64];
     snprintf(path, sizeof path, "romfs:/gfx/scene_%s_%d.png", want->model, i);
@@ -231,7 +307,7 @@ const Scene *gfx_scene(const char *model) {
 }
 
 void gfx_scene_sprite(const SceneSprite *s, float x, float y, float zoom, u8 alpha) {
-  if (!scene_v.scene || s->page >= scene_v.pages) return;
+  if (!scene_v.scene || s->page >= scene_v.pages || s->page >= 4) return;
   draw_tex(scene_v.tex[s->page], s->sx, s->sy, s->w, s->h, x, y, zoom * s->dw / (float)s->w, zoom * s->dh / (float)s->h, false,
            ((u32)alpha << 24) | 0xffffff);
 }
@@ -249,6 +325,7 @@ static void set_color(u32 color) {
 }
 
 void fill_rect(float x, float y, float w, float h, u32 color) {
+  if (w <= 0 || h <= 0) return;
   set_color(color);
   SDL_FRect r = {x, y, w, h};
   SDL_RenderFillRectF(ren, &r);
@@ -302,3 +379,32 @@ void gfx_screenshot(const char *path) {
   SDL_FreeSurface(s);
 }
 #endif
+
+static SDL_Texture *snow_pages[12];
+static unsigned snow_loaded;
+void gfx_snow_free(void) {
+  while(snow_loaded) SDL_DestroyTexture(snow_pages[--snow_loaded]);
+}
+bool gfx_snow_load(void) {
+  if(snow_loaded==snow_page_count)return true;
+  gfx_snow_free();
+  if(snow_page_count>COUNT(snow_pages))return false;
+  for(unsigned i=0;i<snow_page_count;i++){
+    char path[128];snprintf(path,sizeof path,"romfs:/snow/%s.png",snow_page_files[i]);
+    SDL_Texture *p=load_png(path);
+    if(!p){gfx_snow_free();return false;}
+    snow_pages[snow_loaded++]=p;
+  }
+  return true;
+}
+#include "../snow_draw.inc"
+
+const SceneArt *gfx_art(const char *name){
+  if(!scene_v.scene)return NULL;
+  for(int i=0;i<scene_v.scene->art_count;i++)if(!strcmp(scene_v.scene->art[i].name,name))return &scene_v.scene->art[i];
+  return NULL;
+}
+void gfx_art_draw(const SceneArt *a,float x,float y,float kx,float ky,u32 color){
+  if(a && scene_v.scene && a->page<scene_v.pages && a->page<4)
+    draw_tex(scene_v.tex[a->page],a->sx,a->sy,a->w,a->h,x,y,kx,ky,false,color);
+}
