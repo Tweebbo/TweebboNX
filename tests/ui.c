@@ -107,6 +107,8 @@ void gfx_sprite_xy(int p,int sx,int sy,int sw,int sh,float x,float y,float kx,fl
 }
 void fill_round(float x,float y,float w,float h,float r,u32 c) { (void)x;(void)y;(void)w;(void)h;(void)r;(void)c; }
 void fill_circle(float cx,float cy,float r,u32 c) { (void)cx;(void)cy;(void)r;(void)c; }
+const SceneArt *gfx_art(const char *name) { (void)name; return NULL; }
+void gfx_art_draw(const SceneArt *a,float x,float y,float kx,float ky,u32 color) { (void)a;(void)x;(void)y;(void)kx;(void)ky;(void)color; }
 void draw_line(float x0,float y0,float x1,float y1,u32 c) { (void)x0;(void)y0;(void)x1;(void)y1;(void)c; }
 void fill_triangle(float x0,float y0,float x1,float y1,float x2,float y2,u32 c) { (void)x0;(void)y0;(void)x1;(void)y1;(void)x2;(void)y2;(void)c; }
 static void click(int cmd,int arg) {
@@ -167,6 +169,8 @@ int main(void) {
   }
   client_ui_set_tv(false);open_panel(CLOSED);
   assert(client_ui_room_left()==0);
+  assert(client_ui_action(SHOW_ZL) && U.panel==MORE);
+  open_panel(MORE);check_bounds();check_pad_reachability();click(OPEN,SUPPORT);assert(U.panel==SUPPORT);open_panel(CLOSED);
   puts("OK: every panel/key reachable by pad, keyboard shortcuts and dock changes preserve text/focus.");
   W.ents[1]=(Ent){.used=true,.id=2,.guest=2};strcpy(W.ents[1].name,"Visitor");W.room_owner=true;W.room_rights=true;W.owner=1;
   open_panel(PEOPLE);check_bounds();check_pad_reachability();click(SELECT_PERSON,2);
@@ -383,7 +387,8 @@ int main(void) {
   client_ui_action(SHOW_B);assert(U.panel==CLOSED);
   strcpy(W.model,"pool_a");clock_ms=10000;
   pool_receive("{\"now\":10000,\"state\":{\"swimmers\":{\"1\":{\"color\":2,\"booth\":[17,11]}}}}",clock_ms);
-  assert(pool_mode()==1 && pool_swimsuit(1)==2);open_panel(POOL);check_bounds();check_pad_reachability();click(8000,3);assert(strstr(activity_request,"outfit"));
+  assert(pool_mode()==1 && pool_swimsuit(1)==2);open_panel(POOL);check_bounds();check_pad_reachability();
+  click(8006,0);click(8008,0);assert(strstr(activity_request,"outfit")&&strstr(activity_request,"3"));
   pool_receive("{\"now\":10000,\"state\":{\"swimmers\":{\"1\":{\"color\":-9}}}}",clock_ms);assert(pool_swimsuit(1)==-1);
   strcpy(W.model,"pool_b");pool_receive("{\"now\":10000,\"state\":{\"dive\":{\"eid\":1,\"phase\":1,\"motion\":{\"airborne\":false}}}}",clock_ms);
   open_panel(POOL);check_bounds();client_ui_action(SHOW_A);assert(strstr(activity_request,"dive_move")&&strstr(activity_request,"8"));

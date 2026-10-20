@@ -25,9 +25,9 @@ static const char *final_ui_exercise(u64 elapsed){
   switch(step){
     case 0:assert(net_online()&&me&&!strcmp(W.model,"pool_a"));send_walk(17,11);break;
     case 1:if(pool_mode()!=1)return NULL;shot="lido-booth";break;
-    case 2:show_tap(140,82);break;
-    case 3:if(pool_swimsuit(W.me)!=3)return NULL;show_tap(240,190);break;
-    case 4:if(pool_mode())return NULL;send_walk(25,9);break;
+    case 2:show_tap(200,275);break;
+    case 3:show_tap(458,277);break;
+    case 4:if(pool_swimsuit(W.me)<0||pool_mode())return NULL;send_walk(25,9);break;
     case 5:if(!me||me->x!=25||me->y!=9||ent_moving(me,now_ms()))return NULL;show_action(SHOW_A);break;
     case 6:if(strcmp(W.model,"pool_b"))return NULL;shot="lido-signpost";send_walk(26,5);break;
     case 7:if(!me||me->x!=26||me->y!=5||ent_moving(me,now_ms()))return NULL;show_action(SHOW_A);break;
