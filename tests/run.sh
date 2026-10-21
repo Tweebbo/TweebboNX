@@ -7,6 +7,10 @@ podman run --rm -v "$PWD":/work:z -v "$PWD/../Tweebbo-Vita":/Tweebbo-Vita:ro,z -
   tmp=$(mktemp -d)
   trap '\''rm -rf "$tmp"'\'' EXIT
   flags="-std=gnu11 -g -O1 -fsanitize=address,undefined -fno-omit-frame-pointer -Isource"
+  gcc $flags tests/input-repeat.c -o "$tmp/input-repeat"
+  "$tmp/input-repeat"
+  gcc $flags -ffunction-sections -fdata-sections tests/bed-pose.c -Wl,--gc-sections -lm -o "$tmp/bed-pose"
+  "$tmp/bed-pose"
   gcc $flags tests/storage.c source/nx/log.c source/nx/store.c -Wl,--wrap=rename -lpthread -o "$tmp/storage"
   gcc $flags -ffunction-sections -fdata-sections tests/cache.c $(sdl2-config --cflags --libs) -lSDL2_image -lm -Wl,--gc-sections -o "$tmp/cache"
   gcc $flags tests/connection.c -lpthread -o "$tmp/connection"

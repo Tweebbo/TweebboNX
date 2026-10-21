@@ -28,9 +28,9 @@ void log_start(void);
 void log_stop(void);
 
 /** D-pad and stick: one step per press with a short repeat. */
+#include "input_repeat.h"
 static void walk_input(PadState *pad, u64 now) {
-  static u64 next;
-  if (now < next) return;
+  static InputRepeat repeat;
   int dx = 0, dy = 0;
   u64 held = padGetButtons(pad);
   if (held & HidNpadButton_Up) dy = -1;
@@ -44,9 +44,8 @@ static void walk_input(PadState *pad, u64 now) {
     else if (l.y > 12000) dy = -1;
     else if (l.y < -12000) dy = 1;
   }
-  if (!dx && !dy) return;
+  if (!input_repeat(&repeat, dx, dy, now, pool_mode()==2 ? 80 : 180)) return;
   show_walk(dx, dy);
-  next = now + (pool_mode()==2 ? 80 : 180);
 }
 
 int main(int argc, char **argv) {

@@ -35,6 +35,9 @@ int main(void) {
   complete("{\"friends\":[{\"id\":2,\"name\":\"Friend\",\"room\":\"park\"}],\"incoming\":[{\"id\":3,\"name\":\"Guest\"}],\"blocked\":[{\"id\":4,\"name\":\"Blocked\"}]}");
   assert(!F.job && client_social_blocked(4) && !client_social_blocked(2));
   client_social_draw(8,8,310);assert(controls);
+  client_social_action(MY_PROFILE,0);assert(F.view==MY_INFO);client_social_draw(8,8,310);
+  assert(mission_done("A classic mission"));assert(strstr(last_body,"mission"));complete("{\"ok\":true}");
+  F.next_poll=clock_ms+1000;F.job=0;client_social_action(TAB,FRIENDS);
   client_social_action(SELECT,2);client_social_action(VISIT,0);client_social_action(CHAT,0);client_social_update(true);
   complete("{\"friends\":[{\"id\":2,\"name\":\"Friend\",\"room\":\"park\"}]}");assert(F.kind==MESSAGES && F.job);
   complete("[{\"id\":10,\"sender\":2,\"text\":\"Hello\"}]");assert(F.kind==READ && F.job);complete("{\"ok\":true}");assert(!F.job);

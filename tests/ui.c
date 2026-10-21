@@ -60,6 +60,7 @@ const char *net_token(void) { return "test-only-token"; }
 Ent *world_ent(u32 id) { if(id==W.me)return &W.ents[0];return id==2&&W.ents[1].used?&W.ents[1]:NULL; }
 NetState net_state(void) { return state; }
 bool net_online(void) { return state==NET_ONLINE; }
+const char *net_status(void) { return "Disconnected after 30 minutes without activity. Choose Play here to return."; }
 const char *net_server(void) { return server; }
 const char *show_platform(void) { return "Nintendo Switch"; }
 void show_device_badge(int device,float x,float y,float k) {(void)x;(void)y;(void)k;assert(device>=1 && device<=3);}
@@ -76,6 +77,9 @@ int net_http(const char *m,const char *p,const char *j,bool auth) {
     copy(lock_password,sizeof lock_password,json_string_value(json_object_get(v,"password")));
     copy(lock_room,sizeof lock_room,json_string_value(json_object_get(v,"slug")));
     json_decref(v);lock_requests++;
+  }
+  else if(!strcmp(m,"POST") && !strcmp(p,"/api/rooms/rename")) {
+    json_t *v=json_loads(j,0,NULL);assert(v && json_is_string(json_object_get(v,"title")) && !strcmp(json_string_value(json_object_get(v,"slug")),W.slug));json_decref(v);
   }
   else if(!strcmp(m,"POST")) { assert(!strcmp(p,"/api/rooms") && j);json_t *v=json_loads(j,0,NULL);assert(v && !strcmp(json_string_value(json_object_get(v,"token")),net_token()));json_decref(v); }
   else assert(!strcmp(m,"GET") && !strncmp(p,"/api/rooms?scope=",17) && !j);
@@ -148,8 +152,24 @@ static void trade_snapshot(const char *stage,int revision,bool final,int count) 
   W.trade_json=payload;W.trade_rev++;client_ui_update();
 }
 int main(void) {
+  client_ui_reset();
+  open_panel(CHAT);
+  for(int i=0;i<30;i++)client_ui_chat(0,"History fixture");
+  client_ui_action(SHOW_L);
+  assert(U.chat_page==1);
+  int history_end=U.chat_n-U.chat_page*5-U.chat_pending;
+  client_ui_chat(0,"Incoming while reading");
+  assert(U.chat_n-U.chat_page*5-U.chat_pending==history_end);
+  client_ui_action(SHOW_R);
+  assert(!U.chat_page && !U.chat_pending);
+  client_ui_reset();
   W.me=1;W.in_room=true;W.ents[0].used=true;copy(W.name,sizeof W.name,"Tester");copy(W.ents[0].name,sizeof W.ents[0].name,"Tester");
   client_ui_init();
+  client_ui_alert("{\"id\":12345,\"title\":\"Are you still here?\",\"message\":\"You will be disconnected in 2 minutes without activity.\"}");
+  check_bounds();check_pad_reachability();assert(U.count==1 && U.buttons[0].cmd==ALERT_CLOSE);
+  client_ui_action(SHOW_A);assert(!U.alert);
+  state=NET_REPLACED;check_bounds();assert(U.count==1 && U.buttons[0].cmd==RESUME);
+  state=NET_ONLINE;
   for(int tv=0;tv<2;tv++) {
     client_ui_set_tv(tv);
     for(int panel=ME;panel<=HELP;panel++) {open_panel(panel);check_bounds();check_pad_reachability();}
@@ -185,6 +205,13 @@ int main(void) {
   open_panel(MORE);click(OPEN,SETTINGS);assert(U.job);
   response="{\"rooms\":[{\"slug\":\"fixture\",\"locked\":false}]}";result_id=U.job;client_ui_update();
   assert(U.lock_known && !U.locked);check_bounds();check_pad_reachability();
+  click(WRITE,EDIT_ROOM_NAME);strcpy(U.input,"Renamed room");click(SUBMIT,0);assert(U.job && U.job_kind==4);
+  int rename_job=U.job;submit();assert(U.job==rename_job);
+  response="{\"title\":\"Renamed room\"}";result_id=U.job;client_ui_update();assert(!strcmp(W.title,"Renamed room"));
+  click(WRITE,EDIT_ROOM_NAME);strcpy(U.input,"x");click(SUBMIT,0);
+  response="{\"error\":\"Invalid room name\"}";response_status=400;result_id=U.job;client_ui_update();assert(strstr(U.status,"Invalid") && !strcmp(W.title,"Renamed room"));response_status=200;
+  click(WRITE,EDIT_ROOM_NAME);W.room_owner=false;client_ui_update();assert(U.panel==CLOSED);W.room_owner=true;
+  open_panel(SETTINGS);response="{\"rooms\":[{\"slug\":\"fixture\",\"locked\":false}]}";result_id=U.job;client_ui_update();
   click(WRITE,EDIT_ROOM_PASSWORD);strcpy(U.input,"abc");click(SUBMIT,0);assert(U.panel==KEYBOARD && !lock_requests);
   strcpy(U.input,"test-password");click(SUBMIT,0);assert(U.panel==LOCK_CONFIRM && !*U.input);
   check_bounds();check_pad_reachability();click(CLOSE,0);assert(!*U.room_password && !lock_requests);
@@ -237,13 +264,13 @@ int main(void) {
   click(OPEN,NEW_ROOM);check_bounds();check_pad_reachability();click(CREATE_ROOM,0);assert(!U.job);
   click(WRITE,EDIT_TITLE);strcpy(U.input,"Test room");click(SUBMIT,0);click(CREATE_ROOM,0);assert(U.job);
   int pending=U.job;activate(CREATE_ROOM,0);assert(U.job==pending);
-  response="{\"error\":\"You already have five rooms.\"}";response_status=400;result_id=U.job;client_ui_update();assert(!U.job && strstr(U.status,"five"));
+  response="{\"error\":\"Invalid room name or layout.\"}";response_status=400;result_id=U.job;client_ui_update();assert(!U.job && strstr(U.status,"Invalid"));
   click(CREATE_ROOM,0);response="{\"slug\":\"new-room\"}";response_status=200;result_id=U.job;client_ui_update();assert(!strcmp(destination,"new-room") && U.panel==CLOSED);
   U.panel=ROOMS;click(ENTER_ROOM,0);assert(!strcmp(destination,"park"));
   open_panel(ROOMS);response="invalid JSON";result_id=U.job;client_ui_update();assert(U.error[0] && !U.room_n);
   click(REFRESH,0);response="{\"rooms\":[]}";result_id=U.job;client_ui_update();assert(!U.error[0] && !U.room_n);
   click(REFRESH,0);strcpy(server,"offline");state=NET_OFFLINE;client_ui_update();assert(!U.job && U.panel==CLOSED && !U.chat_n);
-  open_panel(ROOMS);assert(!U.error[0] && !U.job && U.visible_n==7);check_bounds();
+  open_panel(ROOMS);assert(!U.error[0] && !U.job && U.visible_n==8);check_bounds();
   click(ENTER_ROOM,0);assert(!strcmp(destination,"lobby"));
   open_panel(HELP);check_bounds();client_ui_draw();assert(client_ui_move(0,1));
   state=NET_LOCKED;W.in_room=false;open_panel(CLOSED);click(WRITE,EDIT_PASSWORD);
@@ -360,7 +387,8 @@ int main(void) {
   open_panel(ME);click(OPEN,ACTIONS);check_bounds();check_pad_reachability();click(GESTURE,GESTURE_DANCE);assert(gestured==GESTURE_DANCE);
   W.ents[0].drink=ids[0];open_panel(ACTIONS);check_bounds();check_pad_reachability();click(PUT_DRINK_AWAY,0);assert(!drink_id && !drink_item);
   W.ents[0].flags=FLAG_LAY;open_panel(ACTIONS);check_bounds();check_pad_reachability();
-  gestured=0;activate(GESTURE,GESTURE_DANCE);activate(GESTURE,GESTURE_SIT);assert(!gestured);
+  gestured=0;activate(GESTURE,GESTURE_DANCE);assert(gestured==GESTURE_DANCE);
+  activate(GESTURE,GESTURE_SIT);assert(gestured==GESTURE_SIT);
   activate(GESTURE,GESTURE_WAVE);assert(gestured==GESTURE_WAVE);
   state=NET_RETRYING;gestured=0;activate(GESTURE,GESTURE_WAVE);assert(!gestured);state=NET_ONLINE;
   state=NET_OFFLINE;W.items[0].def=seat->id;W.items[0].x=4;W.items[0].y=5;
@@ -375,6 +403,11 @@ int main(void) {
     client_casino_reset();client_ui_inspect(999);click(OPEN_CASINO,0);assert(used_item==999 && U.panel==CASINO);
     char payload[800];snprintf(payload,sizeof payload,"{\"t\":\"open\",\"mode\":\"free\",\"item\":999,\"game\":\"%s\",\"bets\":[1,2,5,10,25,50],\"hand\":{\"player\":[0,4],\"dealer\":[2,-1],\"bet\":5},\"poker\":{\"player\":[0,4],\"board\":[2,3,4],\"ante\":5},\"video\":{\"cards\":[0,1,2,3,4]},\"dash\":{\"step\":1,\"steps\":8},\"round\":{\"phase\":\"idle\"}}",casino_keys[game]);
     client_casino_receive(payload);check_bounds();check_pad_reachability();
+    if(game==5) {
+      int holds=0,draws=0;
+      for(int i=0;i<U.count;i++){holds+=U.buttons[i].cmd==6004;draws+=U.buttons[i].cmd==6005;}
+      assert(holds==5 && draws==1);
+    }
     click(6000,1);check_bounds();check_pad_reachability();
     click(6000,2);check_bounds();check_pad_reachability();
     click(6000,0);click(6009,0);check_bounds();check_pad_reachability();click(6009,0);

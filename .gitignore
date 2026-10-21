@@ -12,3 +12,6 @@ source/gen/
 __pycache__/
 romfs/snow/
 romfs/spaces/
+
+# Local emulator binaries and profiles
+tools/eden-cache/

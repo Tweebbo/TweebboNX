@@ -14,6 +14,7 @@ void send_casino(int oo,int aa,int bb,int cc){sends++;op=oo;a=aa;b=bb;c=cc;}
 void client_ui_casino(void){}
 void client_ui_close(void){}
 void client_ui_changed(void){}
+void gfx_furni_preload(u16 def){assert(def==60007 || def==1114 || def==1098 || def==1107);}
 void show_toast(const char *text,u64 now){(void)text;(void)now;}
 static void open_game(int kind,const char *extra) {
   client_casino_reset();client_casino_open(1);assert(C.pending==1);

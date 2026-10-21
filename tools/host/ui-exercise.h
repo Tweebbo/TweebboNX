@@ -4,9 +4,10 @@
 static json_t *host_casino;
 static bool ui_exercise_done;
 static unsigned host_casino_revision;
+static u64 host_casino_received;
 void __real_on_casino(const char *text);
 void __wrap_on_casino(const char *text) {
-  json_decref(host_casino);host_casino=json_loads(text,0,NULL);host_casino_revision++;
+  json_decref(host_casino);host_casino=json_loads(text,0,NULL);host_casino_revision++;host_casino_received=now_ms();
   if(json_is_string(json_object_get(host_casino,"game")))dbg_log("Casino cabinet %llu opened.",(unsigned long long)json_integer_value(json_object_get(host_casino,"item")));
   __real_on_casino(text);
 }
@@ -17,6 +18,9 @@ static const char *casino_ui_exercise(u64 elapsed) {
   static unsigned revision;
   static char shot[64];
   static const char *keys[]={"slot","roulette","blackjack","crash","poker","videopoker","dash"};
+  float panel_w=SCREEN_W-16,table_w=floorf(panel_w*.52f),controls=panel_w-table_w;
+  float first=8+table_w+8+(controls-16)/(game==2?3:2)/2;
+  float second=first+(controls-16)/(game==2?3:2);
   if(elapsed<2000 || game>=7 || elapsed<at+800)return NULL;
   const char *type=host_string(host_casino,"t");
   assert(strcmp(type,"refused") && strcmp(type,"note"));
@@ -33,10 +37,10 @@ static const char *casino_ui_exercise(u64 elapsed) {
       assert(!strcmp(host_string(host_casino,"game"),keys[game]));
       assert(!strcmp(host_string(host_casino,"mode"),"free"));
       snprintf(shot,sizeof shot,"casino-%s-controls",keys[game]);step++;at=elapsed;return shot;
-    case 3:revision=host_casino_revision;show_tap(60,180);break;
+    case 3:revision=host_casino_revision;show_tap(first,180);break;
     case 4:
       if(host_casino_revision==revision){assert(elapsed<at+15000);return NULL;}
-      assert(strcmp(type,"open"));show_tap(160,48);break;
+      assert(strcmp(type,"open"));break;
     case 5:snprintf(shot,sizeof shot,"casino-%s-table-%d",keys[game],slot);step++;at=elapsed;return shot;
     case 6:
       if(game==5)show_tap(40,134);
@@ -44,12 +48,14 @@ static const char *casino_ui_exercise(u64 elapsed) {
     case 7: {
       json_t *hand=json_object_get(host_casino,"hand");
       revision=host_casino_revision;
-      if(game==2 || game==4){if(!*host_string(hand,"result"))show_tap(160,180);else step++;}
-      else if(game==5 || game==6)show_tap(60,180);
+      if(game==2 || game==4){if(!*host_string(hand,"result"))show_tap(second,180);else step++;}
+      else if(game==5 || game==6)show_tap(first,180);
       else if(game==3) {
         const char *p=host_string(json_object_get(host_casino,"round"),"phase");
-        if(!strcmp(p,"running"))show_tap(160,180);
-        else if(!strcmp(p,"crashed"))step++;
+        // Input runs before drawing: wait for an enabled Cash out button to have been painted.
+        if(!strcmp(p,"betting") && now_ms()-host_casino_received>=(u64)json_integer_value(json_object_get(json_object_get(host_casino,"round"),"startsIn"))+200)p="running";
+        if(!strcmp(p,"running"))show_tap(second,180);
+        else if(!strcmp(p,"crashed") || !strcmp(p,"idle"))step++;
         else {assert(elapsed<at+12000);return NULL;}
       } else step++;
       break;
@@ -57,12 +63,12 @@ static const char *casino_ui_exercise(u64 elapsed) {
     case 8:
       if(host_casino_revision==revision){assert(elapsed<at+15000);return NULL;}
       if(game==6 && !json_is_true(json_object_get(host_casino,"done"))) {
-        assert(json_integer_value(json_object_get(host_casino,"step"))>0);revision=host_casino_revision;show_tap(160,180);step=12;at=elapsed;return NULL;
+        assert(json_integer_value(json_object_get(host_casino,"step"))>0);revision=host_casino_revision;show_tap(second,180);step=12;at=elapsed;return NULL;
       }
       break;
     case 9:
       if(game==0 && slot<4 && !json_integer_value(json_object_get(host_casino,"freeLeft"))) {
-        slot++;show_tap(290,106);step=3;at=elapsed;return NULL;
+        slot++;show_tap(SCREEN_W-40,106);step=3;at=elapsed;return NULL;
       }
       show_tap(260,48);break;
     case 10:snprintf(shot,sizeof shot,"casino-%s-rules",keys[game]);step++;at=elapsed;return shot;
@@ -248,6 +254,7 @@ static const char *snow_ui_exercise(u64 elapsed) {
   step++;at=elapsed;return shot;
 }
 #include "final-exercise.h"
+#include "bed-exercise.h"
 static const char *ui_exercise(u64 elapsed) {
   static unsigned step;
   static bool initialized;
@@ -255,6 +262,7 @@ static const char *ui_exercise(u64 elapsed) {
   static char original_room[48];
   static u32 finish_balance;
   if (!getenv("UI_EXERCISE") || !*getenv("UI_EXERCISE")) return NULL;
+  if(!strcmp(getenv("UI_EXERCISE"),"beds"))return bed_ui_exercise(elapsed);
   if(!strcmp(getenv("UI_EXERCISE"),"final")||!strcmp(getenv("UI_EXERCISE"),"final-music"))return final_ui_exercise(elapsed);
   if(!strcmp(getenv("UI_EXERCISE"),"trade"))return trade_ui_exercise(elapsed);
   if(!strcmp(getenv("UI_EXERCISE"),"interactions"))return interaction_ui_exercise(elapsed);
