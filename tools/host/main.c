@@ -192,12 +192,18 @@ int main(int argc, char **argv) {
     net_update(now);
     client_ui_update();
     soak_exercise(now-start);
-    const char *ui_shot=ui_exercise(now-start);
+    const char *ui_shot=getenv("UI_EXERCISE")&&!strcmp(getenv("UI_EXERCISE"),"pets")?NULL:ui_exercise(now-start);
     const char *pad_shot=pad_exercise(now-start);
     if(pad_shot)ui_shot=pad_shot;
+    bool pet_review=getenv("UI_EXERCISE")&&!strcmp(getenv("UI_EXERCISE"),"pets");
+    Pet review[6];
+    if(pet_review)for(int k=0;k<6;k++){memset(&review[k],0,sizeof review[k]);review[k].kind=k;review[k].color=k==2?0:29;review[k].dir=2;snprintf(review[k].action,sizeof review[k].action,"std");pet_prepare(&review[k]);}
     gfx_frame();
     gfx_begin();
-    show_frame(now_ms());
+    if(pet_review){
+      fill_rect(0,0,SCREEN_W,SCREEN_H,0xffe6eeee);
+      for(int k=0;k<6;k++){float x=80+(k%3)*190,y=120+(k/3)*160;pet_draw(&review[k],0,x,y,2);text_draw(pet_kinds[k].name,x,y+52,14,0xff2c2614,1);}
+    }else show_frame(now_ms());
     if(ui_shot) {
       char path[96];snprintf(path,sizeof path,"ui-%d-%s.png",TWEEBBO_DEVICE,ui_shot);gfx_screenshot(path);
     }

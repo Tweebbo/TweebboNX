@@ -36,7 +36,7 @@ bool gfx_photo_preview(const u8 *gray) {
 void gfx_photo_draw(float x,float y,float w,float h){SDL_FRect rect={x,y,w,h};if(photo_texture)SDL_RenderCopyF(ren,photo_texture,NULL,&rect);}
 static SDL_Texture *atlas[ATLAS_MAX];
 static SDL_Texture *font_tex;
-static SDL_Texture *pet_tex[32];
+static SDL_Texture *pet_tex[64];
 static float view_x,view_y,view_kx=1,view_ky=1;
 void gfx_sprite_transform(float x,float y,float kx,float ky){view_x=x;view_y=y;view_kx=kx;view_ky=ky;}
 static bool linear_filter, additive;
