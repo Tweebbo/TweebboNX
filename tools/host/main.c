@@ -87,6 +87,7 @@ int main(int argc, char **argv) {
   conn_global_init(neterr, sizeof neterr);
   net_start(now_ms());
   show_start(now_ms());
+  if (getenv("HOST_TV") && *getenv("HOST_TV")) client_ui_set_tv(true);
   const char *shot = getenv("SHOT"), *shot_ms = getenv("SHOT_MS"), *quit_ms = getenv("QUIT_MS");
   char selected_hotel[128];
   snprintf(selected_hotel, sizeof selected_hotel, "%s", net_server());
@@ -152,6 +153,33 @@ int main(int argc, char **argv) {
         i++; p = strchr(p, ';'); if (p) p++;
       }
     }
+    /* Test hook: SAY="ms:text" shows a chat line from the player (bubble + log) locally. */
+    const char *say = getenv("SAY");
+    static bool said;
+    if (say && *say && !said && now - start >= (u64)atoll(say) && W.me) {
+      said = true; const char *t = strchr(say, ':');
+      if (t) on_chat(W.me, t + 1);
+    }
+    /* Test hook: PADS="ms:KEY;..." presses pad keys in order (A B X Y L R ZL ZR UP DOWN LEFT RIGHT). */
+    const char *pads = getenv("PADS");
+    static int pad_done;
+    if (pads && *pads) {
+      const char *p = pads; int i = 0, ms; char key[8];
+      while (p && sscanf(p, "%d:%7[A-Z]", &ms, key) == 2) {
+        if (i == pad_done && now - start >= (u64)ms) {
+          pad_done++; dbg_log("host: pad %s", key);
+          static const char *names[] = {"A","B","X","Y","L","R","ZL","ZR"};
+          static const int acts[] = {SHOW_A,SHOW_B,SHOW_X,SHOW_Y,SHOW_L,SHOW_R,SHOW_ZL,SHOW_ZR};
+          for (int n = 0; n < 8; n++) if (!strcmp(key, names[n])) show_action(acts[n]);
+          if (!strcmp(key, "UP")) show_walk(0, -1);
+          if (!strcmp(key, "DOWN")) show_walk(0, 1);
+          if (!strcmp(key, "LEFT")) show_walk(-1, 0);
+          if (!strcmp(key, "RIGHT")) show_walk(1, 0);
+          break;
+        }
+        i++; p = strchr(p, ';'); if (p) p++;
+      }
+    }
     if (getenv("EXERCISE") && *getenv("EXERCISE")) {
       static unsigned step;
       static const int actions[] = {SHOW_A, SHOW_B, SHOW_X, SHOW_Y, SHOW_R, SHOW_L, SHOW_OFFLINE, SHOW_OFFLINE};
@@ -194,6 +222,8 @@ int main(int argc, char **argv) {
   if(getenv("UI_EXERCISE") && (!strcmp(getenv("UI_EXERCISE"),"casino") || !strcmp(getenv("UI_EXERCISE"),"snow") || !strcmp(getenv("UI_EXERCISE"),"snow-online") || !strcmp(getenv("UI_EXERCISE"),"final")))assert(ui_exercise_done);
   json_decref(host_casino);host_casino=NULL;json_decref(host_activity);json_decref(host_bar);json_decref(host_music);
   if(getenv("UI_EXERCISE")&&!strcmp(getenv("UI_EXERCISE"),"final-music"))assert(ui_exercise_done);
+  if(getenv("UI_EXERCISE")&&!strcmp(getenv("UI_EXERCISE"),"camera"))assert(ui_exercise_done);
+  if(getenv("UI_EXERCISE")&&!strcmp(getenv("UI_EXERCISE"),"reception"))assert(ui_exercise_done);
   if (getenv("EXERCISE") && *getenv("EXERCISE")) {
     assert(net_online() && me && me->device == DEVICE_SWITCH);
   }

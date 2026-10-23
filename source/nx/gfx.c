@@ -13,6 +13,7 @@
 #include "world.h"
 #include "finishes.h"
 #include "client_shop.h"
+#include "photo_pixels.h"
 
 #define ATLAS_MAX 16
 #define FURNI_CACHE 512
@@ -20,6 +21,19 @@
 
 static SDL_Window *win;
 static SDL_Renderer *ren;
+static u8 *photo_pending;
+static int photo_status;
+static SDL_Texture *photo_texture;
+void gfx_photo_request(u8 *gray){photo_pending=gray;photo_status=0;}
+int gfx_photo_status(void){return photo_status;}
+bool gfx_photo_preview(const u8 *gray) {
+  if(!photo_texture)photo_texture=SDL_CreateTexture(ren,SDL_PIXELFORMAT_ABGR8888,SDL_TEXTUREACCESS_STREAMING,322,234);
+  if(!photo_texture)return false;
+  void *pixels;int pitch;if(SDL_LockTexture(photo_texture,NULL,&pixels,&pitch))return false;
+  for(int y=0;y<234;y++)for(int x=0;x<322;x++)((u32*)((u8*)pixels+y*pitch))[x]=photo_duotone(gray[y*322+x]);
+  SDL_UnlockTexture(photo_texture);return true;
+}
+void gfx_photo_draw(float x,float y,float w,float h){SDL_FRect rect={x,y,w,h};if(photo_texture)SDL_RenderCopyF(ren,photo_texture,NULL,&rect);}
 static SDL_Texture *atlas[ATLAS_MAX];
 static SDL_Texture *font_tex;
 static SDL_Texture *pet_tex[32];
@@ -156,6 +170,7 @@ bool gfx_init(void) {
 }
 
 void gfx_exit(void) {
+  if(photo_texture){SDL_DestroyTexture(photo_texture);photo_texture=NULL;}
   audio_exit();
   gfx_snow_free();
   for(int i=0;i<COUNT(pet_tex);i++)if(pet_tex[i]){SDL_DestroyTexture(pet_tex[i]);pet_tex[i]=NULL;}
@@ -181,7 +196,19 @@ void gfx_begin(void) {
   SDL_RenderClear(ren);
 }
 
-void gfx_present(void) { SDL_RenderPresent(ren); }
+void gfx_present(void) {
+  if(photo_pending) {
+    int w,h;SDL_GetRendererOutputSize(ren,&w,&h);
+    int scale=w/SCREEN_W;if(h/SCREEN_H<scale)scale=h/SCREEN_H;
+    SDL_Surface *frame=SDL_CreateRGBSurfaceWithFormat(0,w,h,32,SDL_PIXELFORMAT_ABGR8888);
+    photo_status=-1;
+    if(frame && scale>0 && SDL_RenderReadPixels(ren,NULL,SDL_PIXELFORMAT_ABGR8888,frame->pixels,frame->pitch)==0) {
+      photo_sample(photo_pending,frame->pixels,frame->pitch/4,(w-322*scale)/2,(h-234*scale)/2,scale);photo_status=1;
+    }
+    SDL_FreeSurface(frame);photo_pending=NULL;
+  }
+  SDL_RenderPresent(ren);
+}
 
 static void draw_tex(SDL_Texture *t, int sx, int sy, int sw, int sh, float x, float y, float kx, float ky, bool flip, u32 color) {
   if (!t) return;
@@ -332,22 +359,21 @@ void fill_rect(float x, float y, float w, float h, u32 color) {
 }
 
 void fill_round(float x, float y, float w, float h, float r, u32 color) {
-  /* Rounded corners approximated with three rects and two circles. */
-  fill_rect(x + r, y, w - 2 * r, h, color);
-  fill_rect(x, y + r, w, h - 2 * r, color);
-  fill_circle(x + r, y + r, r, color);
-  fill_circle(x + w - r, y + r, r, color);
-  fill_circle(x + r, y + h - r, r, color);
-  fill_circle(x + w - r, y + h - r, r, color);
+  x=roundf(x); y=roundf(y); w=roundf(w); h=roundf(h);
+  if(w<=0 || h<=0)return;
+  r=fmaxf(0,fminf(r,fminf(w,h)/2));
+  int band=(int)ceilf(r);
+  for(int i=0;i<band && i<h/2;i++) {
+    float dy=fmaxf(0,r-(i+.5f));
+    float inset=roundf(r-sqrtf(fmaxf(0,r*r-dy*dy)));
+    fill_rect(x+inset,y+i,w-2*inset,1,color);
+    if(h-1-i!=i)fill_rect(x+inset,y+h-1-i,w-2*inset,1,color);
+  }
+  if(h>2*band)fill_rect(x,y+band,w,h-2*band,color);
 }
 
 void fill_circle(float cx, float cy, float r, u32 color) {
-  set_color(color);
-  for (int y = (int)-r; y <= (int)r; y++) {
-    float dx = sqrtf(r * r - (float)(y * y));
-    SDL_FRect row = {cx - dx, cy + y, dx * 2, 1};
-    SDL_RenderFillRectF(ren, &row);
-  }
+  fill_round(cx-r,cy-r,2*r,2*r,r,color);
 }
 
 void fill_triangle(float x1, float y1, float x2, float y2, float x3, float y3, u32 color) {

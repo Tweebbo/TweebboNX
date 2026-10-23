@@ -255,6 +255,8 @@ static const char *snow_ui_exercise(u64 elapsed) {
 }
 #include "final-exercise.h"
 #include "bed-exercise.h"
+#include "camera-exercise.h"
+#include "reception-exercise.h"
 static const char *ui_exercise(u64 elapsed) {
   static unsigned step;
   static bool initialized;
@@ -263,6 +265,8 @@ static const char *ui_exercise(u64 elapsed) {
   static u32 finish_balance;
   if (!getenv("UI_EXERCISE") || !*getenv("UI_EXERCISE")) return NULL;
   if(!strcmp(getenv("UI_EXERCISE"),"beds"))return bed_ui_exercise(elapsed);
+  if(!strcmp(getenv("UI_EXERCISE"),"camera"))return camera_ui_exercise(elapsed);
+  if(!strcmp(getenv("UI_EXERCISE"),"reception"))return reception_ui_exercise(elapsed);
   if(!strcmp(getenv("UI_EXERCISE"),"final")||!strcmp(getenv("UI_EXERCISE"),"final-music"))return final_ui_exercise(elapsed);
   if(!strcmp(getenv("UI_EXERCISE"),"trade"))return trade_ui_exercise(elapsed);
   if(!strcmp(getenv("UI_EXERCISE"),"interactions"))return interaction_ui_exercise(elapsed);

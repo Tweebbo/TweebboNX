@@ -1,5 +1,11 @@
 # Tweebbo for Nintendo Switch
 
+Notice follow-up, 2026-10-23: the thick black stripe above purchase notices is removed. The shared content-frame renderer now uses one row of the original top-border sprite and fills its remaining interior with the panel background.
+
+Local follow-up, 2026-10-23: select Lia in reception and choose Suggestions to submit a suggestion or bug report. Seated wave, kiss, laugh, thumbs-up and sign preserve the seat. Window corner joins and rounded fills are corrected. The common server keeps five virtual residents outside rooms and records Switch separately in moderator tools. NRO rebuilt; desktop harness verified, physical hardware still pending. Review: `../Tweebbo-Vercel/docs/reviews/console-polish-20261023/`.
+
+Local candidate, 2026-10-22: F3 and all four regional lobbies are packed. The navigator uses English PC featured priority. Keep a Camera in inventory, select it and choose Take photo for capture, zoom, caption and save. Saved photos can be placed on walls; opening their stored image still requires the web client. This source work is not yet a published release. Team evidence is in `../Tweebbo-Vercel/docs/reviews/console-polish-20261023/`.
+
 Play Tweebbo on your Nintendo Switch, in the same hotel as [tweebbo.lol](https://tweebbo.lol).
 
 Also on [Nintendo 3DS](https://github.com/Tweebbo/tweebbo-3ds) and [PlayStation Vita](https://github.com/Tweebbo/Tweebbo-Vita).
