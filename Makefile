@@ -80,7 +80,7 @@ all: $(OUTPUT).nro
 
 $(OFILES): $(TOPDIR)/VERSION
 $(OUTPUT).nacp: $(TOPDIR)/VERSION
-$(OUTPUT).nro: $(OUTPUT).elf $(OUTPUT).nacp $(wildcard $(TOPDIR)/romfs/gfx/*.png $(TOPDIR)/romfs/furni/*.png)
+$(OUTPUT).nro: $(OUTPUT).elf $(OUTPUT).nacp $(wildcard $(TOPDIR)/romfs/gfx/*.png $(TOPDIR)/romfs/furni/*.png $(TOPDIR)/romfs/lang/* $(TOPDIR)/romfs/snow/* $(TOPDIR)/romfs/fastfood/* $(TOPDIR)/romfs/battle/*)
 
 $(OUTPUT).elf: $(OFILES)
 

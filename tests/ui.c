@@ -270,7 +270,15 @@ int main(void) {
   open_panel(ROOMS);response="invalid JSON";result_id=U.job;client_ui_update();assert(U.error[0] && !U.room_n);
   click(REFRESH,0);response="{\"rooms\":[]}";result_id=U.job;client_ui_update();assert(!U.error[0] && !U.room_n);
   click(REFRESH,0);strcpy(server,"offline");state=NET_OFFLINE;client_ui_update();assert(!U.job && U.panel==CLOSED && !U.chat_n);
-  open_panel(ROOMS);assert(!U.error[0] && !U.job && U.visible_n==8);check_bounds();
+  open_panel(ROOMS);assert(!U.error[0] && !U.job && U.visible_n==13);check_bounds();
+  int featured=0,game_rooms=0;
+  for(int i=0;i<U.room_n;i++){
+    featured+=U.rooms[i].featured;
+    if(!strcmp(U.rooms[i].slug,"battleball")||!strcmp(U.rooms[i].slug,"snowstorm")){
+      assert(U.rooms[i].official&&!U.rooms[i].featured);game_rooms++;
+    }
+  }
+  assert(featured==3 && game_rooms==2);
   click(ENTER_ROOM,0);assert(!strcmp(destination,"lobby"));
   open_panel(HELP);check_bounds();client_ui_draw();assert(client_ui_move(0,1));
   state=NET_LOCKED;W.in_room=false;open_panel(CLOSED);click(WRITE,EDIT_PASSWORD);

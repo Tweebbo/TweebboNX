@@ -229,7 +229,13 @@ int main(int argc, char **argv) {
   json_decref(host_casino);host_casino=NULL;json_decref(host_activity);json_decref(host_bar);json_decref(host_music);
   if(getenv("UI_EXERCISE")&&!strcmp(getenv("UI_EXERCISE"),"final-music"))assert(ui_exercise_done);
   if(getenv("UI_EXERCISE")&&!strcmp(getenv("UI_EXERCISE"),"camera"))assert(ui_exercise_done);
+  if(getenv("UI_EXERCISE")&&!strcmp(getenv("UI_EXERCISE"),"fastfood"))assert(ui_exercise_done);
+  if(getenv("UI_EXERCISE")&&!strcmp(getenv("UI_EXERCISE"),"battle"))assert(ui_exercise_done);
+  if(getenv("UI_EXERCISE")&&!strcmp(getenv("UI_EXERCISE"),"battle-online"))assert(ui_exercise_done);
+  if(getenv("UI_EXERCISE")&&!strcmp(getenv("UI_EXERCISE"),"snow-peer"))assert(ui_exercise_done);
+  if(getenv("UI_EXERCISE")&&!strcmp(getenv("UI_EXERCISE"),"fastfood-online"))assert(ui_exercise_done);
   if(getenv("UI_EXERCISE")&&!strcmp(getenv("UI_EXERCISE"),"reception"))assert(ui_exercise_done);
+  if(getenv("UI_EXERCISE")&&!strcmp(getenv("UI_EXERCISE"),"languages"))assert(ui_exercise_done);
   if (getenv("EXERCISE") && *getenv("EXERCISE")) {
     assert(net_online() && me && me->device == DEVICE_SWITCH);
   }

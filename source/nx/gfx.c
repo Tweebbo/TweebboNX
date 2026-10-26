@@ -1,8 +1,11 @@
 // Tweebbo Switch graphics: SDL2/OpenGL ES with integer scaling and nearest filtering.
 // Implements the gfx.h contract (ABGR colors, LRU furniture cache, room pages).
 #include "gfx.h"
+#include "language.h"
 #include "audio.h"
 #include "gen/snow_assets.h"
+#include "gen/fastfood_assets.h"
+#include "gen/battle_assets.h"
 #include <SDL.h>
 #include <SDL_image.h>
 #include <math.h>
@@ -36,10 +39,12 @@ bool gfx_photo_preview(const u8 *gray) {
 void gfx_photo_draw(float x,float y,float w,float h){SDL_FRect rect={x,y,w,h};if(photo_texture)SDL_RenderCopyF(ren,photo_texture,NULL,&rect);}
 static SDL_Texture *atlas[ATLAS_MAX];
 static SDL_Texture *font_tex;
+static SDL_Texture *cjk_tex;
 static SDL_Texture *pet_tex[64];
 static float view_x,view_y,view_kx=1,view_ky=1;
 void gfx_sprite_transform(float x,float y,float kx,float ky){view_x=x;view_y=y;view_kx=kx;view_ky=ky;}
 static bool linear_filter, additive;
+static int battle_blend;
 static int win_w = 1280, win_h = 720;
 
 static SDL_Texture *load_png(const char *path);
@@ -173,9 +178,12 @@ void gfx_exit(void) {
   if(photo_texture){SDL_DestroyTexture(photo_texture);photo_texture=NULL;}
   audio_exit();
   gfx_snow_free();
+  gfx_fastfood_free();
+  gfx_battle_free();
   for(int i=0;i<COUNT(pet_tex);i++)if(pet_tex[i]){SDL_DestroyTexture(pet_tex[i]);pet_tex[i]=NULL;}
   for (int i = 0; i < ATLAS_MAX; i++) if (atlas[i]) SDL_DestroyTexture(atlas[i]);
   if (font_tex) SDL_DestroyTexture(font_tex);
+  if (cjk_tex) SDL_DestroyTexture(cjk_tex);
   gfx_room_release();
   for (int i = 0; i < 4; i++) if (scene_v.tex[i]) { SDL_DestroyTexture(scene_v.tex[i]); scene_v.tex[i] = NULL; }
   for (int i = 0; i < FURNI_CACHE; i++) {
@@ -222,7 +230,8 @@ static void draw_tex(SDL_Texture *t, int sx, int sy, int sw, int sh, float x, fl
   else SDL_SetTextureColorMod(t, 255, 255, 255);
   if (a != 255) SDL_SetTextureAlphaMod(t, a);
   else SDL_SetTextureAlphaMod(t, 255);
-  if (additive) SDL_SetTextureBlendMode(t, SDL_BLENDMODE_ADD);
+  if (battle_blend==2) SDL_SetTextureBlendMode(t, SDL_ComposeCustomBlendMode(SDL_BLENDFACTOR_SRC_ALPHA,SDL_BLENDFACTOR_ONE,SDL_BLENDOPERATION_REV_SUBTRACT,SDL_BLENDFACTOR_ZERO,SDL_BLENDFACTOR_ONE,SDL_BLENDOPERATION_ADD));
+  else if (additive) SDL_SetTextureBlendMode(t, SDL_BLENDMODE_ADD);
   else SDL_SetTextureBlendMode(t, SDL_BLENDMODE_BLEND);
   SDL_Rect src = {sx, sy, sw, sh};
   SDL_FRect dst = {x, y, sw * kx, sh * ky};
@@ -248,6 +257,12 @@ void gfx_sprite_solid(int page, int sx, int sy, int sw, int sh, float x, float y
 void gfx_font_sprite(int sx, int sy, int sw, int sh, float x, float y, bool flip, u32 color) {
   draw_tex(font_tex, sx, sy, sw, sh, x, y, 1, 1, flip, color);
 }
+bool gfx_language_font(int language){
+  SDL_Texture *next=NULL;
+  if(language==TW_ZH||language==TW_JA){next=load_png(language==TW_JA?"romfs:/gfx/font-ja.png":"romfs:/gfx/font-zh.png");if(!next)return false;}
+  if(cjk_tex)SDL_DestroyTexture(cjk_tex);cjk_tex=next;return true;
+}
+void gfx_cjk_sprite(int sx,int sy,int sw,int sh,float x,float y,unsigned color){if(cjk_tex)draw_tex(cjk_tex,sx,sy,sw,sh,x,y,1,1,false,color);}
 void gfx_pet_preload(int palette) {
   if(palette<0 || palette>=pet_palette_count || palette>=COUNT(pet_tex) || pet_tex[palette])return;
   char path[64];snprintf(path,sizeof path,"romfs:/gfx/pets_%d.png",palette);pet_tex[palette]=load_png(path);
@@ -335,8 +350,10 @@ const Scene *gfx_scene(const char *model) {
 
 void gfx_scene_sprite(const SceneSprite *s, float x, float y, float zoom, u8 alpha) {
   if (!scene_v.scene || s->page >= scene_v.pages || s->page >= 4) return;
+  if (s->additive) gfx_additive(true);
   draw_tex(scene_v.tex[s->page], s->sx, s->sy, s->w, s->h, x, y, zoom * s->dw / (float)s->w, zoom * s->dh / (float)s->h, false,
            ((u32)alpha << 24) | 0xffffff);
+  if (s->additive) gfx_additive(false);
 }
 
 void gfx_filter(bool linear) { linear_filter = linear; (void)linear_filter; }
@@ -424,6 +441,33 @@ bool gfx_snow_load(void) {
   return true;
 }
 #include "../snow_draw.inc"
+static SDL_Texture *fastfood_pages[2];
+static unsigned fastfood_loaded;
+void gfx_fastfood_free(void) {
+  while(fastfood_loaded) SDL_DestroyTexture(fastfood_pages[--fastfood_loaded]);
+}
+bool gfx_fastfood_load(void) {
+  if(fastfood_loaded==fastfood_page_count)return true;
+  gfx_fastfood_free();
+  if(fastfood_page_count>COUNT(fastfood_pages))return false;
+  for(unsigned i=0;i<fastfood_page_count;i++){
+    char path[128];snprintf(path,sizeof path,"romfs:/fastfood/%s.png",fastfood_page_files[i]);
+    SDL_Texture *p=load_png(path);
+    if(!p){gfx_fastfood_free();return false;}
+    SDL_SetTextureScaleMode(p, SDL_ScaleModeLinear);
+    fastfood_pages[fastfood_loaded++]=p;
+  }
+  return true;
+}
+#include "../fastfood_draw.inc"
+#define BATTLE_TEXTURE SDL_Texture *
+#define BATTLE_FREE(tex) SDL_DestroyTexture(tex)
+#define BATTLE_LOAD(path,target) ((*(target)=load_png(path))!=NULL)
+#define BATTLE_DRAW(tex,...) draw_tex(tex,__VA_ARGS__)
+#define BATTLE_DIRECTORY "romfs:/battle"
+#define BATTLE_EXTENSION ".png"
+#include "../battle_textures.inc"
+void gfx_battle_blend(int mode){battle_blend=mode;gfx_additive(mode==1);}
 
 const SceneArt *gfx_art(const char *name){
   if(!scene_v.scene)return NULL;

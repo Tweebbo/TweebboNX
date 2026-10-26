@@ -17,6 +17,8 @@ void fill_round(float x,float y,float w,float h,float r,u32 c){(void)x;(void)y;(
 void fill_rect(float x,float y,float w,float h,u32 c){(void)x;(void)y;(void)w;(void)h;(void)c;}
 float text_draw(const char *s,float x,float y,float size,u32 c,int align){(void)s;(void)x;(void)y;(void)size;(void)c;(void)align;return 0;}
 float text_width(const char *s,float size){return strlen(s)*size/2;}
+void text_fit(char *s,float size,float max){size_t n=strlen(s);while(n&&text_width(s,size)>max)s[--n]=0;}
+float client_ui_key_hint(const char *key,const char *text,float x,float y,u32 ink,u32 text_ink){(void)key;(void)x;(void)y;(void)ink;(void)text_ink;return text_width(text,12);}
 void client_ui_changed(void){changes++;}
 void client_ui_close(void){}
 void client_ui_edit(const char *title,const char *initial,bool (*submit)(const char *)){(void)title;(void)initial;assert(submit("snow test"));}

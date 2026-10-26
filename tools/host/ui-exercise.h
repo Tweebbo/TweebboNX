@@ -200,6 +200,24 @@ static const char *trade_ui_exercise(u64 elapsed) {
 static unsigned snow_packets;
 void __real_on_snow(const u8 *data,int len);
 void __wrap_on_snow(const u8 *data,int len){snow_packets++;__real_on_snow(data,len);}
+static const char *snow_peer_exercise(u64 elapsed){
+  static int step;static u64 at,started;
+  assert(elapsed<160000);
+  if(elapsed<at+1000)return NULL;
+  const char *shot=NULL;
+  switch(step){
+    case 0:if(!W.in_room)return NULL;client_ui_snow();break;
+    case 1:client_snow_action(7004,atoi(getenv("SNOW_GAME")));break;
+    case 2:if(!client_snow_playing())return NULL;started=elapsed;shot="snow-peer-start";break;
+    case 3:
+      if(client_snow_playing()){client_snow_move(1,0);client_ui_action(SHOW_X);client_ui_action(SHOW_L);client_ui_action(SHOW_A);}
+      if(elapsed<started+130000){at=elapsed;return NULL;}
+      assert(!client_snow_playing()&&snow_packets>600);shot="snow-peer-results";break;
+    case 4:client_snow_action(7009,0);ui_exercise_done=true;dbg_log("PASS: native Snow Storm joins browser, executes commands, completes two-minute match and returns (%u packets)",snow_packets);break;
+    default:return NULL;
+  }
+  step++;at=elapsed;return shot;
+}
 static const char *snow_online_exercise(u64 elapsed){
   static int step;static u64 at,started;
   if(elapsed<3000 || elapsed<at+1000)return NULL;
@@ -257,6 +275,9 @@ static const char *snow_ui_exercise(u64 elapsed) {
 #include "bed-exercise.h"
 #include "camera-exercise.h"
 #include "reception-exercise.h"
+#include "fastfood-exercise.h"
+#include "battle-exercise.h"
+#include "language-exercise.h"
 static const char *ui_exercise(u64 elapsed) {
   static unsigned step;
   static bool initialized;
@@ -264,6 +285,11 @@ static const char *ui_exercise(u64 elapsed) {
   static char original_room[48];
   static u32 finish_balance;
   if (!getenv("UI_EXERCISE") || !*getenv("UI_EXERCISE")) return NULL;
+  if(!strcmp(getenv("UI_EXERCISE"),"languages"))return language_exercise(elapsed);
+  if(!strcmp(getenv("UI_EXERCISE"),"fastfood"))return fastfood_ui_exercise(elapsed);
+  if(!strcmp(getenv("UI_EXERCISE"),"fastfood-online"))return fastfood_online_exercise(elapsed);
+  if(!strcmp(getenv("UI_EXERCISE"),"battle"))return battle_ui_exercise(elapsed);
+  if(!strcmp(getenv("UI_EXERCISE"),"battle-online"))return battle_online_exercise(elapsed);
   if(!strcmp(getenv("UI_EXERCISE"),"beds"))return bed_ui_exercise(elapsed);
   if(!strcmp(getenv("UI_EXERCISE"),"camera"))return camera_ui_exercise(elapsed);
   if(!strcmp(getenv("UI_EXERCISE"),"reception"))return reception_ui_exercise(elapsed);
@@ -271,6 +297,7 @@ static const char *ui_exercise(u64 elapsed) {
   if(!strcmp(getenv("UI_EXERCISE"),"trade"))return trade_ui_exercise(elapsed);
   if(!strcmp(getenv("UI_EXERCISE"),"interactions"))return interaction_ui_exercise(elapsed);
   if(!strcmp(getenv("UI_EXERCISE"),"snow-online"))return snow_online_exercise(elapsed);
+  if(!strcmp(getenv("UI_EXERCISE"),"snow-peer"))return snow_peer_exercise(elapsed);
   if(!strcmp(getenv("UI_EXERCISE"),"snow"))return snow_ui_exercise(elapsed);
   if(!strcmp(getenv("UI_EXERCISE"),"casino"))return casino_ui_exercise(elapsed);
   unsigned first=!strcmp(getenv("UI_EXERCISE"),"settings")?93:0;

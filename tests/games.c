@@ -3,6 +3,13 @@
 World W;
 static bool online=true;
 static int sends,op,from,to,promotion;
+static int opened,closed;
+static char destination[32];
+void client_ui_fastfood(void) { opened=FOOD; }
+void client_ui_snow(void) { opened=SNOW; }
+void client_ui_battle(void) { opened=BATTLE; }
+void client_ui_close(void) { closed++; }
+void net_goto(const char *slug,const char *arrival) { assert(!*arrival);snprintf(destination,sizeof destination,"%s",slug); }
 u64 now_ms(void) {return 100;}
 bool net_online(void) {return online;}
 Ent *world_ent(u32 eid) {for(int i=0;i<MAX_ENTS;i++)if(W.ents[i].used && W.ents[i].id==eid)return &W.ents[i];return NULL;}
@@ -17,6 +24,12 @@ void client_ui_button(float x,float y,float w,float h,const char *s,int command,
 void client_ui_label(const char *s,float x,float y,float w,u32 c) {(void)s;(void)x;(void)y;(void)w;(void)c;}
 size_t client_ui_paragraph(const char *s,float x,float y,float w,int lines,u32 c) {(void)x;(void)y;(void)w;(void)lines;(void)c;return strlen(s);}
 int main(void) {
+  client_games_action(FOOD,0);assert(opened==FOOD);
+  client_games_action(SNOW,0);assert(opened==SNOW);
+  client_games_action(BATTLE,0);assert(opened==BATTLE);
+  client_games_action(BATTLE_LOBBY,0);assert(!strcmp(destination,"battleball")&&closed==1);
+  client_games_action(SNOW_LOBBY,0);assert(!strcmp(destination,"snowstorm")&&closed==2);
+  client_games_action(CENTER,1);
   client_games_reset();W.me=1;W.ents[0]=(Ent){.used=true,.id=2,.guest=2};
   client_games_action(CHALLENGE,2);assert(op==1 && from==1);
   W.invites[0]=(GameInvite){2,3};W.game_rev++;client_games_update(false);client_games_draw(8,8,310);
