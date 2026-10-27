@@ -1,16 +1,12 @@
-# Tweebbo for Nintendo Switch 1.4.0
+# Tweebbo for Nintendo Switch 1.4.1
 
 Play in the same hotel as PC, mobile, Nintendo 3DS and PlayStation Vita.
 
-- Fast Food, Battle Ball and Snow Storm in Game Center, with practice and online play.
-- Classic Battle Ball and Snow Storm lobbies in public rooms and offline navigation.
-- Six languages in Help / Language: English, Spanish, Chinese, Japanese, French and Brazilian Portuguese.
-- More detailed Fast Food textures and smoother scaling, keeping the same 4 MiB texture budget.
-- Game textures and audio are released on close; update downloads have improved buffering and response validation.
-- A saved room that no longer exists returns you to reception.
+- Football: Game Balls, team goals and scoreboards from the Football catalogue. Walk into a ball to kick it, or step towards it to dribble. Goals update matching team scoreboards.
+- Room owners can switch on dance floors and other walk-on furniture with lights, with labelled controls in the furniture window.
 
 Copy `tweebbo.nro` to your SD card's `switch` directory and open it with the Homebrew Menu. Existing players can use the in-game updater.
 
-Tweebbo remains in development. The shared client passed host integration tests; physical Switch performance, sound and suspend/resume are not certified.
+The shared client passed host regression checks. Physical Switch performance, sound and suspend/resume remain unverified.
 
 Full changelog: https://tweebbo.lol/changelog
