@@ -278,6 +278,8 @@ static const char *snow_ui_exercise(u64 elapsed) {
 #include "fastfood-exercise.h"
 #include "battle-exercise.h"
 #include "language-exercise.h"
+#include "feedback-exercise.h"
+#include "update-exercise.h"
 static const char *ui_exercise(u64 elapsed) {
   static unsigned step;
   static bool initialized;
@@ -285,7 +287,10 @@ static const char *ui_exercise(u64 elapsed) {
   static char original_room[48];
   static u32 finish_balance;
   if (!getenv("UI_EXERCISE") || !*getenv("UI_EXERCISE")) return NULL;
+  if(!strcmp(getenv("UI_EXERCISE"),"power"))return NULL;
+  if(!strcmp(getenv("UI_EXERCISE"),"update")||!strcmp(getenv("UI_EXERCISE"),"update-fallback"))return update_ui_exercise(elapsed);
   if(!strcmp(getenv("UI_EXERCISE"),"languages"))return language_exercise(elapsed);
+  if(!strcmp(getenv("UI_EXERCISE"),"feedback"))return feedback_exercise(elapsed);
   if(!strcmp(getenv("UI_EXERCISE"),"fastfood"))return fastfood_ui_exercise(elapsed);
   if(!strcmp(getenv("UI_EXERCISE"),"fastfood-online"))return fastfood_online_exercise(elapsed);
   if(!strcmp(getenv("UI_EXERCISE"),"battle"))return battle_ui_exercise(elapsed);

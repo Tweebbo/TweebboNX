@@ -16,6 +16,7 @@
 #include "client_ui.h"
 #include "world.h"
 #include "update.h"
+#include "frame_pacing.h"
 
 void store_start(void);
 void store_stop(void);
@@ -83,8 +84,12 @@ int main(int argc, char **argv) {
   bool touching = false;
 
   bool running = true;
+  FramePacing pacing = {0};
+  bool previous_tv = false;
   while (running && appletMainLoop()) {
     bool tv = appletGetOperationMode() == AppletOperationMode_Console;
+    bool input_active = tv != previous_tv;
+    previous_tv = tv;
     client_ui_set_tv(tv);
     SDL_Event ev;
     while (SDL_PollEvent(&ev)) {
@@ -92,6 +97,9 @@ int main(int argc, char **argv) {
     }
     padUpdate(&pad);
     u64 down = padGetButtonsDown(&pad);
+    HidAnalogStickState stick = padGetStickPos(&pad, 0), right = padGetStickPos(&pad, 1);
+    input_active |= down || padGetButtons(&pad) || padGetButtonsUp(&pad) ||
+      abs(stick.x) > 12000 || abs(stick.y) > 12000 || abs(right.x) > 12000 || abs(right.y) > 12000;
     if (down & HidNpadButton_A) show_action(SHOW_A);
     if (down & HidNpadButton_B) show_action(SHOW_B);
     if (down & HidNpadButton_X) show_action(SHOW_X);
@@ -107,12 +115,19 @@ int main(int argc, char **argv) {
     bool touched = !tv && hidGetTouchScreenStates(&touch_state, 1) && touch_state.count;
     if (touched && !touching)
       show_tap(touch_state.touches[0].x * (float)SCREEN_W / 1280, touch_state.touches[0].y * (float)SCREEN_H / 720);
+    input_active |= touched || touching;
     touching = touched;
 
     u64 now = now_ms();
     net_update(now);
     client_ui_update();
     if (update_exit_requested()) running = false;
+    if (show_quit_requested()) running = false;
+    if (!running) break;
+    if (!frame_pacing_draw(&pacing, now, input_active || show_animation_active(now))) {
+      SDL_Delay(16);
+      continue;
+    }
     gfx_begin();
     show_frame(now_ms());
     gfx_present();

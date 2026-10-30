@@ -1,13 +1,19 @@
-# Tweebbo for Nintendo Switch 1.4.2
+# Tweebbo for Nintendo Switch 1.4.4
 
-Play in the same hotel as PC, mobile, Nintendo 3DS and PlayStation Vita.
+Optional update: keep playing on your current version and update whenever convenient.
+You do not need to install this immediately.
 
-- Football: Game Balls, team goals and scoreboards from the Football catalogue. Walk into a ball to kick it, or step towards it to dribble. Goals update matching team scoreboards.
-- Room owners can switch on dance floors and other walk-on furniture with lights, with labelled controls in the furniture window.
-- More now includes GoPenguin availability and its website. Your Tweebbo hotel and saved character stay in place.
+- Adds support for smaller future downloads using unchanged installed game files.
+- Versions through 1.4.3 first need this complete bridge update.
+- Shows small/full download sizes and preparation progress.
+- Offers an explicit full download when a small update cannot be used.
+- Preserves the previous file if replacement fails, along with saved characters
+  and settings. Normal exit waits until active update work finishes.
 
-Copy `tweebbo.nro` to your SD card's `switch` directory and open it with the Homebrew Menu. Existing players can use the in-game updater.
+The in-game updater replaces the NRO after verification. Close and reopen Tweebbo from the Homebrew Menu after installing.
 
-The shared client passed host regression checks. Physical Switch performance, sound and suspend/resume remain unverified.
+Updating still needs storage space for the complete reconstructed NRO.
+Host integrity/resume/atomic replacement tests and native builds pass. Physical
+console installation, suspend/power loss and performance acceptance remain pending.
 
 Full changelog: https://tweebbo.lol/changelog

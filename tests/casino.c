@@ -41,6 +41,11 @@ int main(void) {
   W.credits=5000;
   open_game(BLACKJACK,",\"hand\":{\"bet\":10,\"total\":12,\"player\":[4,40],\"dealer\":[5,-1]}");
   client_casino_action(DOUBLE,0);assert(op==7);client_casino_receive("{\"t\":\"bj\",\"hand\":{\"result\":\"win\",\"win\":40}}");assert(!playing());
+  open_game(BLACKJACK,",\"hand\":{\"bet\":10,\"total\":16,\"player\":[28,29],\"dealer\":[5,-1],\"canSplit\":true}");
+  client_casino_action(SPLIT,0);assert(op==20 && C.pending==20);
+  client_casino_receive("{\"t\":\"bj\",\"hand\":{\"bet\":10,\"total\":18,\"player\":[28,36],\"dealer\":[5,-1],\"canSplit\":false,\"activeHand\":0,\"hands\":[{\"player\":[28,36],\"total\":18,\"bet\":10},{\"player\":[29,40],\"total\":18,\"bet\":10}]}}");
+  assert(!C.pending && playing() && json_array_size(json_object_get(C.state,"hands"))==2);
+  int split_sends=sends;client_casino_action(SPLIT,0);assert(sends==split_sends);
   open_game(POKER,",\"poker\":{\"ante\":10,\"player\":[0,1]}");
   W.credits=19;int before=sends;client_casino_action(PLAY,0);assert(sends==before);
   client_casino_action(SECOND,0);assert(op==13);W.credits=5000;

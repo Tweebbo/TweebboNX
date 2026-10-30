@@ -22,6 +22,7 @@ void doorbell_ring(void) {}
 void doorbell_answer(bool allow) {}
 void doorbell_set(bool enabled) { doorbell.enabled = enabled; }
 void client_camera_update(void) {}
+void typing_input(const char *text) { (void)text; }
 void client_camera_action(int cmd, int arg) {}
 void client_camera_draw(float x, float y, float w, float h) {}
 bool client_camera_capturing(void) { return false; }

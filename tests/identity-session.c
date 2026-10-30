@@ -4,6 +4,7 @@ World W;
 void store_save(const char *key,const char *value){assert(key&&value);}
 int main(void){
   mutex_init(&N.mu);
+  job_signal_init(&N.http_wake);
   strcpy(N.token,"fixture-original");strcpy(N.ep.host,"127.0.0.1");N.ep.port=18997;
   int id=net_http("POST","/api/owner-profile","{}",true);assert(id);
   const u8 packet[]={22,0};assert(q_push(&N.out,packet,sizeof packet));assert(q_push(&N.in,packet,sizeof packet));

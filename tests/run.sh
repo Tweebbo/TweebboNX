@@ -7,6 +7,10 @@ podman run --rm -v "$PWD":/work:z -v "$PWD/../Tweebbo-Vita":/Tweebbo-Vita:ro,z -
   tmp=$(mktemp -d)
   trap '\''rm -rf "$tmp"'\'' EXIT
   flags="-std=gnu11 -g -O1 -fsanitize=address,undefined -fno-omit-frame-pointer -Isource"
+  gcc $flags -ffunction-sections -fdata-sections tests/power.c source/world.c -Wl,--gc-sections -lm -o "$tmp/power"
+  "$tmp/power"
+  gcc $flags -ffunction-sections -fdata-sections tests/http-idle.c -Wl,--gc-sections -lpthread -lm -o "$tmp/http-idle"
+  "$tmp/http-idle"
   gcc $flags tests/input-repeat.c -o "$tmp/input-repeat"
   "$tmp/input-repeat"
   gcc $flags -ffunction-sections -fdata-sections tests/bed-pose.c -Wl,--gc-sections -lm -o "$tmp/bed-pose"
@@ -20,7 +24,7 @@ podman run --rm -v "$PWD":/work:z -v "$PWD/../Tweebbo-Vita":/Tweebbo-Vita:ro,z -
   for device in 2 3; do
     canvas="-DSCREEN_W=640 -DSCREEN_H=360"
     [ "$device" = 2 ] || canvas="-DSCREEN_W=480 -DSCREEN_H=272"
-    gcc $flags $canvas -DTWEEBBO_DEVICE=$device -ffunction-sections -fdata-sections tests/ui.c tests/ui-services.c source/language.c source/audio.c source/client_music.c source/client_identity.c source/client_bar.c source/client_pool.c source/client_casino.c source/client_trade.c source/client_pets.c source/pets.c source/client_games.c source/client_social.c source/client_build.c source/catalog.c source/avatar.c source/paylink.c source/update.c vendor/qrcodegen/qrcodegen.c source/gen/assets.c -Wl,--gc-sections -ljansson -lmbedtls -lmbedx509 -lmbedcrypto -lm -o "$tmp/ui-$device"
+    gcc $flags $canvas -DTWEEBBO_DEVICE=$device -ffunction-sections -fdata-sections tests/ui.c tests/ui-services.c source/language.c source/audio.c source/client_music.c source/client_identity.c source/client_bar.c source/client_pool.c source/client_casino.c source/client_trade.c source/client_pets.c source/pets.c source/client_games.c source/client_social.c source/client_build.c source/catalog.c source/avatar.c source/paylink.c source/update.c source/incremental.c vendor/qrcodegen/qrcodegen.c source/gen/assets.c -Wl,--gc-sections -ljansson -lmbedtls -lmbedx509 -lmbedcrypto -lz -lm -o "$tmp/ui-$device"
   done
   gcc $flags tests/audio.c source/audio.c -lpthread -o "$tmp/audio"
   gcc $flags tests/text.c source/text.c source/gen/font.c -lm -o "$tmp/text"
@@ -50,4 +54,8 @@ podman run --rm -v "$PWD":/work:z -v "$PWD/../Tweebbo-Vita":/Tweebbo-Vita:ro,z -
   ./identity-session
   ./storage
   SDL_VIDEODRIVER=dummy ./cache
+  cd /work
+  python3 tests/incremental.py
+  python3 tests/incremental-generator.py
+  python3 tests/incremental-worker.py
 '

@@ -21,6 +21,7 @@
 #include "client_shop.h"
 #include "pets.h"
 #include "world.h"
+#include "frame_pacing.h"
 
 void gfx_screenshot(const char *path);
 
@@ -75,6 +76,7 @@ void store_save(const char *key, const char *value) {
 }
 
 #include "ui-exercise.h"
+#include "power-exercise.h"
 
 int main(int argc, char **argv) {
   if (argc > 1) data_dir = argv[1];
@@ -94,9 +96,14 @@ int main(int argc, char **argv) {
   u64 start = now_ms(), next_step = 0;
   bool running = true, shot_done = false;
   u64 frames = 0, previous_frame = start, longest_frame = 0;
+  FramePacing pacing = {0};
+  bool power_review = getenv("UI_EXERCISE") && !strcmp(getenv("UI_EXERCISE"), "power");
+  unsigned quiet_ticks=0, quiet_draws=0, busy_ticks=0, busy_draws=0;
   while (running) {
+    bool input_active = false;
     SDL_Event ev;
     while (SDL_PollEvent(&ev)) {
+      input_active |= ev.type == SDL_KEYDOWN || ev.type == SDL_KEYUP || ev.type == SDL_MOUSEBUTTONDOWN || ev.type == SDL_MOUSEBUTTONUP;
       if (ev.type == SDL_QUIT) running = false;
       if (ev.type == SDL_KEYDOWN && !ev.key.repeat) {
         switch (ev.key.keysym.sym) {
@@ -112,6 +119,7 @@ int main(int argc, char **argv) {
       }
     }
     const Uint8 *k = SDL_GetKeyboardState(NULL);
+    input_active |= k[SDL_SCANCODE_RIGHT] || k[SDL_SCANCODE_LEFT] || k[SDL_SCANCODE_DOWN] || k[SDL_SCANCODE_UP];
     u64 now = now_ms();
     if (now >= next_step) {
       int dx = k[SDL_SCANCODE_RIGHT] - k[SDL_SCANCODE_LEFT], dy = k[SDL_SCANCODE_DOWN] - k[SDL_SCANCODE_UP];
@@ -189,8 +197,9 @@ int main(int argc, char **argv) {
         if (step == 8) assert(!strcmp(net_server(), selected_hotel));
       }
     }
-    net_update(now);
+    if (!power_review || !W.in_room) net_update(now);
     client_ui_update();
+    if (power_review) input_active |= power_exercise(now-start);
     soak_exercise(now-start);
     const char *ui_shot=getenv("UI_EXERCISE")&&!strcmp(getenv("UI_EXERCISE"),"pets")?NULL:ui_exercise(now-start);
     const char *pad_shot=pad_exercise(now-start);
@@ -198,6 +207,17 @@ int main(int argc, char **argv) {
     bool pet_review=getenv("UI_EXERCISE")&&!strcmp(getenv("UI_EXERCISE"),"pets");
     Pet review[6];
     if(pet_review)for(int k=0;k<6;k++){memset(&review[k],0,sizeof review[k]);review[k].kind=k;review[k].color=k==2?0:29;review[k].dir=2;snprintf(review[k].action,sizeof review[k].action,"std");pet_prepare(&review[k]);}
+    bool active = input_active || show_animation_active(now) ||
+      (getenv("UI_EXERCISE") && *getenv("UI_EXERCISE") && !power_review) ||
+      (getenv("PAD_EXERCISE") && *getenv("PAD_EXERCISE")) ||
+      (getenv("EXERCISE") && *getenv("EXERCISE"));
+    bool draw = frame_pacing_draw(&pacing, now, active);
+    if (power_review) {
+      if (now-start>=7000 && now-start<8500) { quiet_ticks++; quiet_draws+=draw; }
+      if (now-start>=9500 && now-start<14500) { busy_ticks++; busy_draws+=draw; }
+      if (input_active) assert(draw);
+    }
+    if (!draw) { SDL_Delay(16); continue; }
     gfx_frame();
     gfx_begin();
     if(pet_review){
@@ -225,10 +245,16 @@ int main(int argc, char **argv) {
           (unsigned long long)longest_frame, net_state(), W.in_room);
   Ent *me = world_ent(W.me);
   dbg_log("host: local device=%u", me ? me->device : 0);
+  if (power_review) {
+    dbg_log("power: quiet %u/%u frames/ticks; keyboard + movement %u/%u; immediate input rendered",quiet_draws,quiet_ticks,busy_draws,busy_ticks);
+    assert(quiet_ticks>=30 && quiet_draws>0 && quiet_draws*10<=quiet_ticks*7);
+    assert(busy_ticks>=30 && busy_draws==busy_ticks);
+  }
   if(getenv("UI_EXERCISE") && (!strcmp(getenv("UI_EXERCISE"),"casino") || !strcmp(getenv("UI_EXERCISE"),"snow") || !strcmp(getenv("UI_EXERCISE"),"snow-online") || !strcmp(getenv("UI_EXERCISE"),"final")))assert(ui_exercise_done);
   json_decref(host_casino);host_casino=NULL;json_decref(host_activity);json_decref(host_bar);json_decref(host_music);
   if(getenv("UI_EXERCISE")&&!strcmp(getenv("UI_EXERCISE"),"final-music"))assert(ui_exercise_done);
   if(getenv("UI_EXERCISE")&&!strcmp(getenv("UI_EXERCISE"),"camera"))assert(ui_exercise_done);
+  if(getenv("UI_EXERCISE")&&(!strcmp(getenv("UI_EXERCISE"),"update")||!strcmp(getenv("UI_EXERCISE"),"update-fallback")))assert(ui_exercise_done);
   if(getenv("UI_EXERCISE")&&!strcmp(getenv("UI_EXERCISE"),"fastfood"))assert(ui_exercise_done);
   if(getenv("UI_EXERCISE")&&!strcmp(getenv("UI_EXERCISE"),"battle"))assert(ui_exercise_done);
   if(getenv("UI_EXERCISE")&&!strcmp(getenv("UI_EXERCISE"),"battle-online"))assert(ui_exercise_done);

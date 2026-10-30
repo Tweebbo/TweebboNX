@@ -141,6 +141,10 @@ static void check_pad_reachability(void) {
       if(!seen[U.focus]){seen[U.focus]=true;queue[tail++]=U.focus;}
     }
   }
+  if(tail!=U.count){
+    fprintf(stderr,"Unreachable controls: device=%d panel=%d focus=%d reached=%d total=%d\n",TWEEBBO_DEVICE,U.panel,saved,tail,U.count);
+    for(int i=0;i<U.count;i++)if(!seen[i])fprintf(stderr,"control %d cmd=%d arg=%d rect=%.0f,%.0f,%.0f,%.0f\n",i,U.buttons[i].cmd,U.buttons[i].arg,U.buttons[i].x,U.buttons[i].y,U.buttons[i].w,U.buttons[i].h);
+  }
   assert(tail==U.count);
   U.focus=saved;
 }
@@ -153,7 +157,9 @@ static void trade_snapshot(const char *stage,int revision,bool final,int count) 
 }
 int main(void) {
   client_ui_reset();
+  assert(!client_ui_animation_active());
   open_panel(CHAT);
+  assert(client_ui_animation_active());
   for(int i=0;i<30;i++)client_ui_chat(0,"History fixture");
   client_ui_action(SHOW_L);
   assert(U.chat_page==1);
