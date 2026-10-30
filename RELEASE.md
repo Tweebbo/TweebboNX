@@ -1,16 +1,14 @@
-# Tweebbo for Nintendo Switch 1.4.5
+# Tweebbo for Nintendo Switch 1.4.6
 
-Optional update. Keep playing and update whenever convenient.
+Optional visual update. Keep playing and update whenever convenient.
 
-- L/R zoom through overview, standard and character close-up views.
-- Touch a player or furniture to open its action menu. Floor taps still walk, and window controls keep priority.
-- Typing uses a rounded classic speech bubble with a pointed tail.
-- Balls and other sliding furniture move smoothly between tiles. Footballs rebound from barriers and recheck the next tile during a kick.
-- Blackjack allows splitting equal-value cards, including 10 + King and Jack + Queen.
-- Smaller update downloads remain available for supported installed versions, with the complete NRO as fallback.
+- Typing bubbles sit beside the face, with a short tail pointing toward the mouth.
+- Sent-message dots start at mouth height and respect sitting/lying poses and elevation.
+- Nearby device badges no longer cover the typing dots.
+- Smaller update downloads are available from supported installed versions; the complete NRO remains available.
 
-The updater verifies the NRO before replacing it. Reopen Tweebbo after updating and keep your saved data. Reconstruction still needs space for the complete NRO.
+Keep your saved data and reopen Tweebbo after updating. Reconstruction still needs space for the complete NRO.
 
-Native builds, host UI, collision, protocol and updater integrity tests pass. Physical-console installation, touch accuracy and performance acceptance remain pending.
+Host checks, visual review and native builds pass. Physical-console installation and performance acceptance remain pending.
 
 Full changelog: https://tweebbo.lol/changelog
