@@ -29,7 +29,7 @@ You need a Nintendo Switch with homebrew enabled (Atmosphere and the Homebrew Me
 | B | Open rooms, close or cancel |
 | Y / X | Chat / wave |
 | D-Pad | Walk, navigate lists or move furniture while placing |
-| L / R | Zoom; turn pages in windows; rotate or change height while placing |
+| L / R | Zoom out / in: whole room, standard, close-up; turn pages in windows; rotate or change height while placing |
 | ZL / ZR | Open Tools in the room; change catalogue section or Navigator page |
 | + | Quit |
 

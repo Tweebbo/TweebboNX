@@ -280,6 +280,8 @@ static const char *snow_ui_exercise(u64 elapsed) {
 #include "language-exercise.h"
 #include "feedback-exercise.h"
 #include "update-exercise.h"
+#include "room-controls-exercise.h"
+
 static const char *ui_exercise(u64 elapsed) {
   static unsigned step;
   static bool initialized;
@@ -288,6 +290,7 @@ static const char *ui_exercise(u64 elapsed) {
   static u32 finish_balance;
   if (!getenv("UI_EXERCISE") || !*getenv("UI_EXERCISE")) return NULL;
   if(!strcmp(getenv("UI_EXERCISE"),"power"))return NULL;
+  if(!strcmp(getenv("UI_EXERCISE"),"room-controls"))return room_controls_exercise(elapsed);
   if(!strcmp(getenv("UI_EXERCISE"),"update")||!strcmp(getenv("UI_EXERCISE"),"update-fallback"))return update_ui_exercise(elapsed);
   if(!strcmp(getenv("UI_EXERCISE"),"languages"))return language_exercise(elapsed);
   if(!strcmp(getenv("UI_EXERCISE"),"feedback"))return feedback_exercise(elapsed);

@@ -98,6 +98,7 @@ int main(int argc, char **argv) {
   u64 frames = 0, previous_frame = start, longest_frame = 0;
   FramePacing pacing = {0};
   bool power_review = getenv("UI_EXERCISE") && !strcmp(getenv("UI_EXERCISE"), "power");
+  bool controls_review = getenv("UI_EXERCISE") && !strcmp(getenv("UI_EXERCISE"), "room-controls");
   unsigned quiet_ticks=0, quiet_draws=0, busy_ticks=0, busy_draws=0;
   while (running) {
     bool input_active = false;
@@ -197,7 +198,7 @@ int main(int argc, char **argv) {
         if (step == 8) assert(!strcmp(net_server(), selected_hotel));
       }
     }
-    if (!power_review || !W.in_room) net_update(now);
+    if ((!power_review && !controls_review) || !W.in_room) net_update(now);
     client_ui_update();
     if (power_review) input_active |= power_exercise(now-start);
     soak_exercise(now-start);
@@ -255,6 +256,7 @@ int main(int argc, char **argv) {
   if(getenv("UI_EXERCISE")&&!strcmp(getenv("UI_EXERCISE"),"final-music"))assert(ui_exercise_done);
   if(getenv("UI_EXERCISE")&&!strcmp(getenv("UI_EXERCISE"),"camera"))assert(ui_exercise_done);
   if(getenv("UI_EXERCISE")&&(!strcmp(getenv("UI_EXERCISE"),"update")||!strcmp(getenv("UI_EXERCISE"),"update-fallback")))assert(ui_exercise_done);
+  if(controls_review)assert(ui_exercise_done);
   if(getenv("UI_EXERCISE")&&!strcmp(getenv("UI_EXERCISE"),"fastfood"))assert(ui_exercise_done);
   if(getenv("UI_EXERCISE")&&!strcmp(getenv("UI_EXERCISE"),"battle"))assert(ui_exercise_done);
   if(getenv("UI_EXERCISE")&&!strcmp(getenv("UI_EXERCISE"),"battle-online"))assert(ui_exercise_done);

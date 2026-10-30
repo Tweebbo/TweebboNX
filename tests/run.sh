@@ -24,6 +24,7 @@ podman run --rm -v "$PWD":/work:z -v "$PWD/../Tweebbo-Vita":/Tweebbo-Vita:ro,z -
   for device in 2 3; do
     canvas="-DSCREEN_W=640 -DSCREEN_H=360"
     [ "$device" = 2 ] || canvas="-DSCREEN_W=480 -DSCREEN_H=272"
+    gcc $flags $canvas -DTWEEBBO_DEVICE=$device -ffunction-sections -fdata-sections tests/room-input.c source/world.c -Wl,--gc-sections -ljansson -lm -o "$tmp/room-input-$device"
     gcc $flags $canvas -DTWEEBBO_DEVICE=$device -ffunction-sections -fdata-sections tests/ui.c tests/ui-services.c source/language.c source/audio.c source/client_music.c source/client_identity.c source/client_bar.c source/client_pool.c source/client_casino.c source/client_trade.c source/client_pets.c source/pets.c source/client_games.c source/client_social.c source/client_build.c source/catalog.c source/avatar.c source/paylink.c source/update.c source/incremental.c vendor/qrcodegen/qrcodegen.c source/gen/assets.c -Wl,--gc-sections -ljansson -lmbedtls -lmbedx509 -lmbedcrypto -lz -lm -o "$tmp/ui-$device"
   done
   gcc $flags tests/audio.c source/audio.c -lpthread -o "$tmp/audio"
@@ -40,6 +41,8 @@ podman run --rm -v "$PWD":/work:z -v "$PWD/../Tweebbo-Vita":/Tweebbo-Vita:ro,z -
   ./snow
   ./devices
   ./devices-vita
+  ./room-input-2
+  ./room-input-3
   ./ui-2
   ./ui-3
   ./text

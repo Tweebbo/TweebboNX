@@ -4,7 +4,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-u64 now_ms(void) { return 1000; }
+static u64 clock_ms=1000;
+u64 now_ms(void) { return clock_ms; }
 void dbg_log(const char *fmt, ...) { (void)fmt; }
 void on_room(void) {}
 void on_chat(u32 id, const char *s) { (void)id; (void)s; }
@@ -50,6 +51,29 @@ int main(void) {
   assert(W.trade_rev==1 && !strcmp(W.trade_json,"{\"stage\":\"invite\"}"));
   world_handle(w.buf,w.len-1);assert(W.trade_rev==2 && !W.trade_json);
   puts("OK: trade snapshots reach the client; truncated packets invalidate old confirmations.");
+  W.items[0]=(Item){.used=true,.id=100,.def=61001,.x=2,.y=3};
+  w_begin(&w,S_SLIDE);w_var(&w,1);w_var(&w,100);w_u16(&w,61001);
+  w_u8(&w,3);w_u8(&w,3);w_u8(&w,0);w_u8(&w,3);w_var(&w,1);w_u16(&w,0);
+  world_handle(w.buf,w.len);
+  float x,y,z;item_pos(world_item(100),1250,&x,&y,&z);
+  assert(x==2.5f && y==3 && z==0);
+  clock_ms=1250;
+  w_begin(&w,S_ITEM_UPDATE);w_var(&w,100);w_u16(&w,61001);
+  w_u8(&w,3);w_u8(&w,3);w_u8(&w,0);w_u8(&w,2);w_var(&w,1);w_u16(&w,0);
+  world_handle(w.buf,w.len);item_pos(world_item(100),1250,&x,&y,&z);
+  assert(x==2.5f && world_item(100)->state==2);
+  w_begin(&w,S_SLIDE);w_var(&w,1);w_var(&w,100);w_u16(&w,61001);
+  w_u8(&w,4);w_u8(&w,3);w_u8(&w,0);w_u8(&w,2);w_var(&w,1);w_u16(&w,32);
+  world_handle(w.buf,w.len);item_pos(world_item(100),1500,&x,&y,&z);
+  assert(x==3.25f && y==3 && z==16);
+  item_pos(world_item(100),2000,&x,&y,&z);assert(x==4 && z==32);
+  clock_ms=2000;
+  w_begin(&w,S_ITEM_UPDATE);w_var(&w,100);w_u16(&w,61001);
+  w_u8(&w,5);w_u8(&w,3);w_u8(&w,0);w_u8(&w,0);w_var(&w,1);w_u16(&w,0);
+  world_handle(w.buf,w.len);item_pos(world_item(100),2000,&x,&y,&z);
+  assert(x==5 && z==0 && !world_item(100)->slide_at);
+  world_handle(w.buf,w.len-1);assert(world_item(100)->x==5);
+  puts("OK: slides interpolate position and height, survive state updates, restart from the current position and ignore truncated packets.");
 }
 
 void on_activity(const char *json){(void)json;}
