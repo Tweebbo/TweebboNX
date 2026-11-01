@@ -19,5 +19,13 @@ int main(void) {
   assert(furni_oldest(entries,512,&entries[1])==&entries[2]);
   entries[1].tex=NULL;
   assert(furni_oldest(entries,512,NULL)==&entries[2]);
+  FurniTex failed={.used=true,.def=1001,.page=0,.retry_at=2000};
+  assert(!furni_needs_load(&failed,1001,0,0));
+  assert(!furni_needs_load(&failed,1001,0,1999));
+  assert(furni_needs_load(&failed,1001,0,2000));
+  failed.tex=(void *)1;
+  assert(!furni_needs_load(&failed,1001,0,3000));
+  assert(furni_needs_load(&failed,1002,0,0));
+  assert(furni_needs_load(&failed,1001,1,0));
   puts("OK: Vita fills all 512 texture slots, preserves hits and evicts the least recently used entry.");
 }

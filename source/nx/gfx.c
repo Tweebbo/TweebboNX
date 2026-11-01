@@ -64,7 +64,7 @@ static struct {
   int pages;
 } scene_v;
 
-typedef struct { u16 def; u8 page; bool used; SDL_Texture *tex; u32 stamp; size_t bytes; } FurniTex;
+typedef struct { u16 def; u8 page; bool used; SDL_Texture *tex; u32 stamp; size_t bytes; u64 retry_at; } FurniTex;
 static FurniTex furni_cache[FURNI_CACHE];
 static u32 furni_clock;
 static size_t furni_bytes;
@@ -82,10 +82,11 @@ static SDL_Texture *furni_get(u16 def, int page) {
     if (c->used && c->def == def && c->page == page) { slot = c; break; }
     if (victim->used && (!c->used || c->stamp < victim->stamp)) victim = c;
   }
-  if (!slot) {
+  if (slot && !slot->tex && now_ms() < slot->retry_at) return NULL;
+  if (!slot || !slot->tex) {
     char path[64];
     snprintf(path, sizeof path, "romfs:/furni/d%u_%d.png", def, page);
-    slot = victim;
+    if (!slot) slot = victim;
     furni_evict(slot);
     slot->tex = load_png(path);
     if (slot->tex) {
@@ -107,6 +108,7 @@ static SDL_Texture *furni_get(u16 def, int page) {
     slot->def = def;
     slot->page = (u8)page;
     slot->used = true;
+    slot->retry_at = slot->tex ? 0 : now_ms() + 2000;
   }
   slot->stamp = ++furni_clock;
   return slot->tex;

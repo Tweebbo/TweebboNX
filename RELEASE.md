@@ -1,13 +1,9 @@
-# Tweebbo for Nintendo Switch 1.4.7
+# Tweebbo for Nintendo Switch 1.4.8
 
-Optional music and room update. Keep playing and update whenever convenient.
+Optional furniture loading fix. Keep playing and update whenever convenient.
 
-- The Jukebox can queue the 72 original Kepler Classic cartridge loops. A track added on PC plays on this console, and the console playlist can add the same tracks.
-- Room Trax songs saved by anyone in the room can be added from the console. YouTube and Spotify links remain PC and phone only.
-- Room music now uses the original interface sounds for a new console message, a sent message and credits received.
-- Wall posters, paintings and other wall items stay on the visible wall face while placing or moving them.
-- The complete NRO remains available. Keep your saved data and reopen Tweebbo after updating.
+- Furniture textures retry after a temporary loading failure instead of staying invisible for the rest of the session.
+- Existing rooms, furniture and saved characters are kept.
+- Smaller updates are available from supported installed versions, with the complete NRO as fallback.
 
-Host checks, visual review and native builds pass. Physical-console installation and performance acceptance remain pending.
-
-Full changelog: https://tweebbo.lol/changelog
+Reopen Tweebbo from the Homebrew Menu after updating. Automated cache checks and native builds pass. Physical-console installation and performance acceptance remain pending.

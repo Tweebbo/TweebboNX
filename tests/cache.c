@@ -3,15 +3,19 @@
 #include <SDL.h>
 #include <SDL_image.h>
 static int loads;
+static int failures;
+static Uint64 clock_ms;
 static int texture_size = 4;
 static SDL_Surface *fake_load(const char *path) {
   (void)path;
   loads++;
+  if(failures>0){failures--;return NULL;}
   return SDL_CreateRGBSurfaceWithFormat(0, texture_size, texture_size, 32, SDL_PIXELFORMAT_RGBA8888);
 }
 #define IMG_Load fake_load
 #include "../source/nx/gfx.c"
 void dbg_log(const char *fmt, ...) { (void)fmt; }
+u64 now_ms(void) { return clock_ms; }
 int main(void) {
   assert(SDL_Init(SDL_INIT_VIDEO) == 0);
   win = SDL_CreateWindow("test", 0, 0, 64, 64, 0);
@@ -44,6 +48,17 @@ int main(void) {
   }
   for (int i = 0; i < FURNI_CACHE; i++) furni_evict(&furni_cache[i]);
   assert(furni_bytes == 0);
+  failures=1;
+  assert(!furni_get(1001,0));
+  const int failed_loads=loads;
+  for(int i=0;i<120;i++)assert(!furni_get(1001,0));
+  assert(loads==failed_loads);
+  clock_ms=2000;
+  assert(furni_get(1001,0));
+  assert(loads==failed_loads+1);
+  assert(furni_get(1001,0));
+  assert(loads==failed_loads+1);
+  for(int i=0;i<FURNI_CACHE;i++)furni_evict(&furni_cache[i]);
   SDL_DestroyRenderer(ren);
   SDL_DestroyWindow(win);
   SDL_Quit();
