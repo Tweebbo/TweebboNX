@@ -1,6 +1,8 @@
 #include "../source/client_social.c"
 #include <assert.h>
 
+void client_music_ui_sound(const char *name) {(void)name;}
+
 World W;
 static int requests, result_id, response_status=200, controls;
 static u64 clock_ms=100;
