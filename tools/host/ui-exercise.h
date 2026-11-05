@@ -131,10 +131,10 @@ static const char *interaction_ui_exercise(u64 elapsed) {
     case 12:show_tap(250,130);break;
     case 13:shot="interact-drink-choice";break;
     case 14:show_tap(180,163);break;
-    case 18:assert(me && me->drink);show_tap(30,SCREEN_H-16);break;
+    case 18:assert(me && me->drink);show_tap(SCREEN_W/2-3*(SCREEN_W>=600?66:50),SCREEN_H-16);break;
     case 19:show_tap(120,205);break;
     case 20:shot="character-actions";break;
-    case 21:show_tap(100,172);break;
+    case 21:show_tap(100,SCREEN_H<260?206:215);break;
     case 22:assert(me && !me->drink);client_ui_inspect(items[2]);break;
     case 23:shot="interact-dice";break;
     case 24:show_tap(180,80);break;
@@ -144,7 +144,13 @@ static const char *interaction_ui_exercise(u64 elapsed) {
     case 32:assert(world_item(items[2])->state==0);client_ui_inspect(items[3]);break;
     case 33:shot="interact-toggle";break;
     case 34:show_tap(180,80);break;
-    case 35:assert(world_item(items[3])->state==1);show_tap(30,SCREEN_H-16);break;
+    case 35:
+      assert(world_item(items[3])->state==1);
+      if(!strcmp(getenv("UI_EXERCISE"),"furniture")){
+        ui_exercise_done=true;shot="interact-complete";
+        dbg_log("PASS: native seat, selected drink, put-away, dice roll/close and toggle through real UI input.");
+      }else show_tap(SCREEN_W/2-3*(SCREEN_W>=600?66:50),SCREEN_H-16);
+      break;
     case 36:show_tap(120,205);break;
     case 37:show_tap(120,108);break;
     case 38:assert(me && (me->flags&FLAG_DANCE));show_tap(315,SCREEN_H-16);break;
@@ -278,9 +284,16 @@ static const char *snow_ui_exercise(u64 elapsed) {
 #include "fastfood-exercise.h"
 #include "battle-exercise.h"
 #include "language-exercise.h"
+#include "wired-language-exercise.h"
 #include "feedback-exercise.h"
 #include "update-exercise.h"
 #include "room-controls-exercise.h"
+#include "expansion-exercise.h"
+#include "magic-height-exercise.h"
+#include "magic-gameplay-exercise.h"
+#include "wired-services-exercise.h"
+#include "wired-live-exercise.h"
+#include "official-disc-exercise.h"
 
 static const char *ui_exercise(u64 elapsed) {
   static unsigned step;
@@ -290,9 +303,16 @@ static const char *ui_exercise(u64 elapsed) {
   static u32 finish_balance;
   if (!getenv("UI_EXERCISE") || !*getenv("UI_EXERCISE")) return NULL;
   if(!strcmp(getenv("UI_EXERCISE"),"power"))return NULL;
+  if(!strcmp(getenv("UI_EXERCISE"),"official-disc"))return official_disc_exercise(elapsed);
+  if(!strcmp(getenv("UI_EXERCISE"),"expansion"))return expansion_ui_exercise(elapsed);
+  if(!strcmp(getenv("UI_EXERCISE"),"magic-height"))return magic_height_exercise(elapsed);
+  if(!strcmp(getenv("UI_EXERCISE"),"magic-gameplay"))return magic_gameplay_exercise(elapsed);
+  if(!strncmp(getenv("UI_EXERCISE"),"wired-live-",11))return wired_live_exercise(elapsed);
+  if(!strcmp(getenv("UI_EXERCISE"),"wired-services"))return wired_services_ui_exercise(elapsed);
   if(!strcmp(getenv("UI_EXERCISE"),"room-controls"))return room_controls_exercise(elapsed);
   if(!strcmp(getenv("UI_EXERCISE"),"update")||!strcmp(getenv("UI_EXERCISE"),"update-fallback"))return update_ui_exercise(elapsed);
   if(!strcmp(getenv("UI_EXERCISE"),"languages"))return language_exercise(elapsed);
+  if(!strcmp(getenv("UI_EXERCISE"),"wired-languages"))return wired_language_exercise(elapsed);
   if(!strcmp(getenv("UI_EXERCISE"),"feedback"))return feedback_exercise(elapsed);
   if(!strcmp(getenv("UI_EXERCISE"),"fastfood"))return fastfood_ui_exercise(elapsed);
   if(!strcmp(getenv("UI_EXERCISE"),"fastfood-online"))return fastfood_online_exercise(elapsed);
@@ -303,7 +323,7 @@ static const char *ui_exercise(u64 elapsed) {
   if(!strcmp(getenv("UI_EXERCISE"),"reception"))return reception_ui_exercise(elapsed);
   if(!strcmp(getenv("UI_EXERCISE"),"final")||!strcmp(getenv("UI_EXERCISE"),"final-music"))return final_ui_exercise(elapsed);
   if(!strcmp(getenv("UI_EXERCISE"),"trade"))return trade_ui_exercise(elapsed);
-  if(!strcmp(getenv("UI_EXERCISE"),"interactions"))return interaction_ui_exercise(elapsed);
+  if(!strcmp(getenv("UI_EXERCISE"),"interactions") || !strcmp(getenv("UI_EXERCISE"),"furniture"))return interaction_ui_exercise(elapsed);
   if(!strcmp(getenv("UI_EXERCISE"),"snow-online"))return snow_online_exercise(elapsed);
   if(!strcmp(getenv("UI_EXERCISE"),"snow-peer"))return snow_peer_exercise(elapsed);
   if(!strcmp(getenv("UI_EXERCISE"),"snow"))return snow_ui_exercise(elapsed);

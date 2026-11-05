@@ -15,6 +15,7 @@
 #include "common.h"
 #include "gfx.h"
 #include "net.h"
+#include "update.h"
 #include "proto.h"
 #include "show.h"
 #include "client_ui.h"
@@ -76,6 +77,7 @@ void store_save(const char *key, const char *value) {
 }
 
 #include "ui-exercise.h"
+#include "effects-exercise.h"
 #include "power-exercise.h"
 
 int main(int argc, char **argv) {
@@ -99,6 +101,8 @@ int main(int argc, char **argv) {
   FramePacing pacing = {0};
   bool power_review = getenv("UI_EXERCISE") && !strcmp(getenv("UI_EXERCISE"), "power");
   bool controls_review = getenv("UI_EXERCISE") && !strcmp(getenv("UI_EXERCISE"), "room-controls");
+  bool effects_swim_review=getenv("UI_EXERCISE")&&!strcmp(getenv("UI_EXERCISE"),"effects-swim");
+  bool effects_review = effects_swim_review||(getenv("UI_EXERCISE") && !strcmp(getenv("UI_EXERCISE"), "effects"));
   unsigned quiet_ticks=0, quiet_draws=0, busy_ticks=0, busy_draws=0;
   while (running) {
     bool input_active = false;
@@ -202,7 +206,7 @@ int main(int argc, char **argv) {
     client_ui_update();
     if (power_review) input_active |= power_exercise(now-start);
     soak_exercise(now-start);
-    const char *ui_shot=getenv("UI_EXERCISE")&&!strcmp(getenv("UI_EXERCISE"),"pets")?NULL:ui_exercise(now-start);
+    const char *ui_shot=effects_review||(getenv("UI_EXERCISE")&&!strcmp(getenv("UI_EXERCISE"),"pets"))?NULL:ui_exercise(now-start);
     const char *pad_shot=pad_exercise(now-start);
     if(pad_shot)ui_shot=pad_shot;
     bool pet_review=getenv("UI_EXERCISE")&&!strcmp(getenv("UI_EXERCISE"),"pets");
@@ -221,7 +225,8 @@ int main(int argc, char **argv) {
     if (!draw) { SDL_Delay(16); continue; }
     gfx_frame();
     gfx_begin();
-    if(pet_review){
+    if(effects_review){ui_shot=effects_render_frame(effects_swim_review);}
+    else if(pet_review){
       fill_rect(0,0,SCREEN_W,SCREEN_H,0xffe6eeee);
       for(int k=0;k<6;k++){float x=80+(k%3)*190,y=120+(k/3)*160;pet_draw(&review[k],0,x,y,2);text_draw(pet_kinds[k].name,x,y+52,14,0xff2c2614,1);}
     }else show_frame(now_ms());
@@ -256,7 +261,11 @@ int main(int argc, char **argv) {
   if(getenv("UI_EXERCISE")&&!strcmp(getenv("UI_EXERCISE"),"final-music"))assert(ui_exercise_done);
   if(getenv("UI_EXERCISE")&&!strcmp(getenv("UI_EXERCISE"),"camera"))assert(ui_exercise_done);
   if(getenv("UI_EXERCISE")&&(!strcmp(getenv("UI_EXERCISE"),"update")||!strcmp(getenv("UI_EXERCISE"),"update-fallback")))assert(ui_exercise_done);
+  if(getenv("UI_EXERCISE")&&!strcmp(getenv("UI_EXERCISE"),"official-disc"))assert(ui_exercise_done);
   if(controls_review)assert(ui_exercise_done);
+  if(effects_review)assert(ui_exercise_done);
+  if(getenv("UI_EXERCISE")&&!strcmp(getenv("UI_EXERCISE"),"furniture"))assert(ui_exercise_done);
+  if(getenv("UI_EXERCISE")&&!strcmp(getenv("UI_EXERCISE"),"expansion"))assert(ui_exercise_done);
   if(getenv("UI_EXERCISE")&&!strcmp(getenv("UI_EXERCISE"),"fastfood"))assert(ui_exercise_done);
   if(getenv("UI_EXERCISE")&&!strcmp(getenv("UI_EXERCISE"),"battle"))assert(ui_exercise_done);
   if(getenv("UI_EXERCISE")&&!strcmp(getenv("UI_EXERCISE"),"battle-online"))assert(ui_exercise_done);
@@ -264,9 +273,11 @@ int main(int argc, char **argv) {
   if(getenv("UI_EXERCISE")&&!strcmp(getenv("UI_EXERCISE"),"fastfood-online"))assert(ui_exercise_done);
   if(getenv("UI_EXERCISE")&&!strcmp(getenv("UI_EXERCISE"),"reception"))assert(ui_exercise_done);
   if(getenv("UI_EXERCISE")&&!strcmp(getenv("UI_EXERCISE"),"languages"))assert(ui_exercise_done);
+  if(getenv("UI_EXERCISE")&&!strcmp(getenv("UI_EXERCISE"),"wired-languages"))assert(ui_exercise_done);
   if (getenv("EXERCISE") && *getenv("EXERCISE")) {
     assert(net_online() && me && me->device == DEVICE_SWITCH);
   }
+  update_shutdown();
   net_stop();
   conn_global_exit();
   gfx_exit();

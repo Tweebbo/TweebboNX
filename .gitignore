@@ -8,8 +8,7 @@ tweebbo.vpk
 romfs/gfx/
 romfs/furni/
 romfs/classic/
-source/gen/*
-!source/gen/classic_music.h
+source/gen/
 __pycache__/
 romfs/snow/
 romfs/fastfood/
@@ -19,14 +18,3 @@ romfs/spaces/
 
 # Local emulator binaries and profiles
 tools/eden-cache/
-
-.env*
-*.key
-*.pem
-*.log
-*.md
-!README.md
-!RELEASE.md
-!docs/GUIDE.md
-!docs/RELEASE.md
-!docs/ONLINE.md

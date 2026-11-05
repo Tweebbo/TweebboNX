@@ -1,3 +1,4 @@
+#include "gfx_color.h"
 // Tweebbo Switch graphics: SDL2/OpenGL ES with integer scaling and nearest filtering.
 // Implements the gfx.h contract (ABGR colors, LRU furniture cache, room pages).
 #include "gfx.h"
@@ -17,12 +18,17 @@
 #include "finishes.h"
 #include "client_shop.h"
 #include "photo_pixels.h"
+#include "gfx_highlight_gl.h"
 
-#define ATLAS_MAX 16
+#define ATLAS_MAX 64
 #define FURNI_CACHE 512
 #define FURNI_BYTES (64u * 1024 * 1024)
 
 static SDL_Window *win;
+static uint32_t modulation=UINT32_MAX;
+void gfx_modulate(u32 color){modulation=color;}
+static int highlight_kind;static GfxHighlightMatrix highlight_matrix;
+void gfx_highlight(int kind,u32 rgb,int strength){highlight_kind=kind>=2&&kind<=4&&strength>0?kind:0;gfx_highlight_matrix(kind,rgb,strength,&highlight_matrix);}
 static SDL_Renderer *ren;
 static u8 *photo_pending;
 static int photo_status;
@@ -38,6 +44,8 @@ bool gfx_photo_preview(const u8 *gray) {
 }
 void gfx_photo_draw(float x,float y,float w,float h){SDL_FRect rect={x,y,w,h};if(photo_texture)SDL_RenderCopyF(ren,photo_texture,NULL,&rect);}
 static SDL_Texture *atlas[ATLAS_MAX];
+static struct {SDL_Texture *texture;u64 key;u16 effect;u32 used;int x,y,w,h;} avatar_fx[128];
+static u32 avatar_fx_frame;
 static SDL_Texture *font_tex;
 static SDL_Texture *cjk_tex;
 static SDL_Texture *pet_tex[64];
@@ -134,7 +142,9 @@ void fill_circle(float cx, float cy, float r, u32 color);
 static SDL_Texture *load_png(const char *path) {
   SDL_Surface *s = IMG_Load(path);
   if (!s) { dbg_log("texture missing: %s (%s)", path, IMG_GetError()); return NULL; }
-  SDL_Texture *t = SDL_CreateTextureFromSurface(ren, s);
+  SDL_Surface *rgba=SDL_ConvertSurfaceFormat(s,SDL_PIXELFORMAT_ABGR8888,0);
+  SDL_Texture *t = rgba?SDL_CreateTextureFromSurface(ren, rgba):NULL;
+  if(rgba)SDL_FreeSurface(rgba);
   SDL_FreeSurface(s);
   if (t) {
     SDL_SetTextureBlendMode(t, SDL_BLENDMODE_BLEND);
@@ -153,12 +163,14 @@ bool gfx_init(void) {
     return false;
   }
   SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "0");
+  SDL_SetHint(SDL_HINT_RENDER_DRIVER,"opengles2");
   win = SDL_CreateWindow("Tweebbo", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 1280, 720,
                          SDL_WINDOW_FULLSCREEN_DESKTOP | SDL_WINDOW_ALLOW_HIGHDPI);
   if (!win) { dbg_log("CreateWindow failed: %s", SDL_GetError()); return false; }
   SDL_GetWindowSize(win, &win_w, &win_h);
   ren = SDL_CreateRenderer(win, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
   if (!ren) { dbg_log("CreateRenderer failed: %s", SDL_GetError()); return false; }
+  if(!highlight_gl_init())return false;
   SDL_RenderSetLogicalSize(ren, SCREEN_W, SCREEN_H);
   SDL_RenderSetIntegerScale(ren, SDL_TRUE);
   SDL_SetRenderDrawBlendMode(ren, SDL_BLENDMODE_BLEND);
@@ -177,6 +189,8 @@ bool gfx_init(void) {
 }
 
 void gfx_exit(void) {
+  for(int i=0;i<COUNT(avatar_fx);i++)if(avatar_fx[i].texture)SDL_DestroyTexture(avatar_fx[i].texture);
+  avatar_effect_pixels_close();
   if(photo_texture){SDL_DestroyTexture(photo_texture);photo_texture=NULL;}
   audio_exit();
   gfx_snow_free();
@@ -191,6 +205,7 @@ void gfx_exit(void) {
   for (int i = 0; i < FURNI_CACHE; i++) {
     furni_evict(&furni_cache[i]);
   }
+  highlight_gl_exit();
   if (ren) SDL_DestroyRenderer(ren);
   if (win) SDL_DestroyWindow(win);
   IMG_Quit();
@@ -202,6 +217,7 @@ void gfx_frame(void) {
 }
 
 void gfx_begin(void) {
+  avatar_fx_frame++;
   SDL_SetRenderDrawColor(ren, 0x0b, 0x0d, 0x0e, 255);
   SDL_RenderClear(ren);
 }
@@ -222,10 +238,12 @@ void gfx_present(void) {
 
 static void draw_tex(SDL_Texture *t, int sx, int sy, int sw, int sh, float x, float y, float kx, float ky, bool flip, u32 color) {
   if (!t) return;
+  color=gfx_color_multiply(color,modulation);
   x=view_x+x*view_kx;y=view_y+y*view_ky;kx*=view_kx;ky*=view_ky;
   bool flip_y=ky<0;
   if(kx<0){x+=sw*kx;kx=-kx;flip=!flip;}
   if(ky<0){y+=sh*ky;ky=-ky;}
+  if(highlight_kind){highlight_gl_draw(ren,t,sx,sy,sw,sh,x,y,sw*kx,sh*ky,flip,flip_y,color,&highlight_matrix,additive,battle_blend==2);return;}
   u8 r, g, b, a;
   tex_color(color, &r, &g, &b, &a);
   if (r != 255 || g != 255 || b != 255) SDL_SetTextureColorMod(t, r, g, b);
@@ -238,6 +256,28 @@ static void draw_tex(SDL_Texture *t, int sx, int sy, int sw, int sh, float x, fl
   SDL_Rect src = {sx, sy, sw, sh};
   SDL_FRect dst = {x, y, sw * kx, sh * ky};
   SDL_RenderCopyExF(ren, t, &src, &dst, 0, NULL, (SDL_RendererFlip)((flip?SDL_FLIP_HORIZONTAL:0)|(flip_y?SDL_FLIP_VERTICAL:0)));
+}
+
+bool gfx_avatar_effect(u64 key,u16 effect,const AvatarFxDraw *parts,unsigned count,bool mirrored,float x,float y,float scale,u8 alpha){
+  int slot=-1;
+  for(int i=0;i<COUNT(avatar_fx);i++){
+    if(avatar_fx[i].texture&&avatar_fx[i].key==key&&avatar_fx[i].effect==effect){slot=i;goto draw;}
+    if(!avatar_fx[i].texture){if(slot<0||avatar_fx[slot].texture)slot=i;}
+    else if(avatar_fx[i].used!=avatar_fx_frame&&(slot<0||(avatar_fx[slot].texture&&avatar_fx[i].used<avatar_fx[slot].used)))slot=i;
+  }
+  if(slot<0)return false;
+  AvatarFxBitmap bitmap;if(!avatar_effect_compose(parts,count,mirrored,effect,&bitmap))return false;
+  SDL_Texture *texture=SDL_CreateTexture(ren,SDL_PIXELFORMAT_ABGR8888,SDL_TEXTUREACCESS_STATIC,bitmap.width,bitmap.height);
+  if(!texture){free(bitmap.pixels);return false;}
+  if(SDL_UpdateTexture(texture,NULL,bitmap.pixels,bitmap.width*4)){SDL_DestroyTexture(texture);free(bitmap.pixels);return false;}
+  free(bitmap.pixels);SDL_SetTextureScaleMode(texture,SDL_ScaleModeNearest);
+  if(avatar_fx[slot].texture)SDL_DestroyTexture(avatar_fx[slot].texture);
+  avatar_fx[slot].texture=texture;avatar_fx[slot].key=key;avatar_fx[slot].effect=effect;
+  avatar_fx[slot].x=bitmap.x;avatar_fx[slot].y=bitmap.y;avatar_fx[slot].w=bitmap.width;avatar_fx[slot].h=bitmap.height;
+draw:
+  avatar_fx[slot].used=avatar_fx_frame;
+  draw_tex(avatar_fx[slot].texture,0,0,avatar_fx[slot].w,avatar_fx[slot].h,x+avatar_fx[slot].x*scale,y+avatar_fx[slot].y*scale,scale,scale,false,0x00ffffffu|((u32)alpha<<24));
+  return true;
 }
 
 void gfx_sprite(int page, int sx, int sy, int sw, int sh, float x, float y, float scale, bool flip, u32 color) {
@@ -262,7 +302,8 @@ void gfx_font_sprite(int sx, int sy, int sw, int sh, float x, float y, bool flip
 bool gfx_language_font(int language){
   SDL_Texture *next=NULL;
   if(language==TW_ZH||language==TW_JA){next=load_png(language==TW_JA?"romfs:/gfx/font-ja.png":"romfs:/gfx/font-zh.png");if(!next)return false;}
-  if(cjk_tex)SDL_DestroyTexture(cjk_tex);cjk_tex=next;return true;
+  if(cjk_tex)SDL_DestroyTexture(cjk_tex);
+  cjk_tex=next;return true;
 }
 void gfx_cjk_sprite(int sx,int sy,int sw,int sh,float x,float y,unsigned color){if(cjk_tex)draw_tex(cjk_tex,sx,sy,sw,sh,x,y,1,1,false,color);}
 void gfx_pet_preload(int palette) {

@@ -9,6 +9,9 @@ podman image exists tweebbo-switch-host || podman build -t tweebbo-switch-host t
 host_profile=${HOST_PROFILE:-data}
 [[ "$host_profile" =~ ^[a-zA-Z0-9_-]+$ ]] || { echo 'Use a simple isolated HOST_PROFILE name'; exit 2; }
 mkdir -p "build/host/$host_profile"
+if [ "${UI_EXERCISE:-}" = expansion ]; then
+  cp ../hotel/tests/fixtures/wired-variable-editors.json "build/host/$host_profile/variable-editors.json"
+fi
 host_run_root=/work/build/host
 if [ "$host_profile" != data ]; then
   mkdir -p "build/host/run-$host_profile"
@@ -36,7 +39,7 @@ podman run --rm --network host -v "$PWD":/work:z -w /work -e SHOT=/work/build/ho
   gcc -std=gnu11 -O2 ${HOST_CFLAGS:-} -Wall -DTWEEBBO_HOST -DTWEEBBO_DEVICE=$HOST_DEVICE -DSCREEN_W=$HOST_WIDTH -DSCREEN_H=$HOST_HEIGHT -DTWEEBBO_LAN_ONLY=1 -DDEFAULT_SERVER="\"${SERVER:-ws://127.0.0.1:8096}\"" -DAPP_VERSION="\"${HOST_VERSION:-$(cat VERSION)}-host\"" -D_GNU_SOURCE \
     -Isource -Ivendor/quickjs -fwrapv -fno-strict-aliasing -DCONFIG_VERSION='\''"2026-06-04"'\'' $(sdl2-config --cflags) -o build/host/tweebbo-host \
     source/*.c source/gen/*.c vendor/quickjs/*.c vendor/qrcodegen/*.c source/nx/gfx.c source/nx/audio-backend.c source/nx/conn.c tools/host/main.c \
-    $(sdl2-config --libs) -lSDL2_image -lmbedtls -lmbedx509 -lmbedcrypto -ljansson -lz -lpthread -lm -Wl,--wrap=on_casino -Wl,--wrap=on_snow -Wl,--wrap=on_activity -Wl,--wrap=on_music -Wl,--wrap=audio_mix
+    $(sdl2-config --libs) -lSDL2_image -lmbedtls -lmbedx509 -lmbedcrypto -ljansson -lz -lpthread -lm -Wl,--wrap=on_casino -Wl,--wrap=on_snow -Wl,--wrap=on_activity -Wl,--wrap=on_music -Wl,--wrap=audio_mix -Wl,--wrap=net_http -Wl,--wrap=net_http_result -Wl,--wrap=audio_play
   printf "%s\n" "$build_key" > build/host/build-key
   fi
   export SDL_AUDIODRIVER=dummy

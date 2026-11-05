@@ -28,6 +28,7 @@ void send_rotate(u32 id) {assert(id);}
 void send_redeem(u32 id) {assert(id);}
 void send_game(int op,u32 a,int b,int c,int d) {(void)op;(void)a;(void)b;(void)c;(void)d;}
 void send_pet(const char *json) {pet_requests++;snprintf(pet_request,sizeof pet_request,"%s",json);}
+void send_furniture(const char *json) { assert(json && *json); }
 static char trade_request[512];
 static int trade_requests;
 void send_trade(const char *json) {trade_requests++;snprintf(trade_request,sizeof trade_request,"%s",json);}
@@ -102,6 +103,10 @@ void text_fit(char *s,float size,float max) { (void)size; if(strlen(s)*6>max)s[(
 float text_draw(const char *s,float x,float y,float size,u32 c,int align) { (void)s;(void)x;(void)y;(void)size;(void)c;(void)align;return 0; }
 void gfx_sprite(int p,int sx,int sy,int sw,int sh,float x,float y,float k,bool flip,u32 c) {
   (void)p;(void)sx;(void)sy;(void)sw;(void)sh;(void)x;(void)y;(void)k;(void)flip;(void)c;
+}
+bool gfx_avatar_effect(u64 key,u16 effect,const AvatarFxDraw *parts,unsigned count,bool mirrored,float x,float y,float scale,u8 alpha) {
+  (void)key;(void)effect;(void)parts;(void)count;(void)mirrored;(void)x;(void)y;(void)scale;(void)alpha;
+  return false;
 }
 void gfx_sprite_solid(int p,int sx,int sy,int sw,int sh,float x,float y,float kx,float ky,bool flip,u32 c) {
   (void)p;(void)sx;(void)sy;(void)sw;(void)sh;(void)x;(void)y;(void)kx;(void)ky;(void)flip;(void)c;
@@ -396,7 +401,15 @@ int main(void) {
   drink_id=0;activate(GET_DRINK,0);assert(!drink_id);W.items[0].used=true;
   W.items[0].def=dice->id;W.items[0].state=7;client_ui_inspect(999);used_item=0;activate(USE_ITEM,0);assert(!used_item);
   W.items[0].state=3;check_bounds();check_pad_reachability();click(CLOSE_DICE,0);assert(used_item==999 && used_op==1 && U.panel==CLOSED);
-  W.items[0].def=seat->id;client_ui_inspect(999);click(USE_ITEM,0);assert(used_op==0 && U.panel==CLOSED);
+  W.items[0].def=seat->id;W.items[0].x=4;W.items[0].y=5;walked_x=walked_y=-1;
+  client_ui_inspect(999);click(USE_ITEM,0);assert(walked_x==4 && walked_y==5 && U.panel==CLOSED);
+  W.items[0].def=1086;W.items[0].state=0;used_item=0;client_ui_inspect(999);
+  check_bounds();check_pad_reachability();click(CHANGE_STATE,0);assert(used_item==999 && used_op==0);
+  used_item=0;walked_x=walked_y=-1;client_ui_inspect(999);click(USE_ITEM,0);
+  assert(!used_item && walked_x==4 && walked_y==5);
+  W.items[0].def=1047;W.items[0].state=8;used_item=0;client_ui_inspect(999);activate(USE_ITEM,0);assert(!used_item);
+  W.items[0].state=7;client_ui_inspect(999);check_bounds();check_pad_reachability();click(USE_ITEM,0);
+  assert(used_item==999 && used_op==0);
   W.items[0].def=toggle->id;client_ui_inspect(999);state=NET_RETRYING;used_item=0;activate(USE_ITEM,0);assert(!used_item);state=NET_ONLINE;
   open_panel(ME);click(OPEN,ACTIONS);check_bounds();check_pad_reachability();click(GESTURE,GESTURE_DANCE);assert(gestured==GESTURE_DANCE);
   W.ents[0].drink=ids[0];open_panel(ACTIONS);check_bounds();check_pad_reachability();click(PUT_DRINK_AWAY,0);assert(!drink_id && !drink_item);

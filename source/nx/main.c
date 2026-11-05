@@ -134,6 +134,7 @@ int main(int argc, char **argv) {
     if (show_quit_requested()) running = false;
   }
 
+  update_shutdown();
   net_stop();
   conn_global_exit();
   gfx_exit();
