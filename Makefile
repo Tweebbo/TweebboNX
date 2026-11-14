@@ -20,11 +20,17 @@ ROMFS       :=  romfs
 APP_TITLE   :=  Tweebbo
 APP_AUTHOR  :=  Tweebbo
 APP_VERSION :=  $(shell cat $(TOPDIR)/VERSION)
+STABILITY_DIAGNOSTICS ?= 0
+ifeq ($(STABILITY_DIAGNOSTICS),1)
+BUILD := build-stability
+TARGET := tweebbo-stability-private
+endif
 
 ARCH    :=  -march=armv8-a+crc+crypto -mtune=cortex-a57 -mtp=soft -fPIE
 CFLAGS  :=  -g -Wall -O2 -ffunction-sections -fwrapv -fno-strict-aliasing $(ARCH) $(DEFINES)
 CFLAGS  +=  $(INCLUDE) -D__SWITCH__ -D_GNU_SOURCE -DCONFIG_VERSION='"2026-06-04"'
 CFLAGS  +=  -DAPP_VERSION='"$(APP_VERSION)"' -DTWEEBBO_DEVICE=2
+CFLAGS  +=  -DSTABILITY_DIAGNOSTICS=$(STABILITY_DIAGNOSTICS)
 # The hotel the client plays on (set by build.sh: tweebbo.lol, or a LAN hotel for showcases).
 CFLAGS  +=  -DDEFAULT_SERVER='"$(TWEEBBO_SERVER)"'
 ifeq ($(TWEEBBO_LAN_ONLY),1)

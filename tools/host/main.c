@@ -15,6 +15,7 @@
 #include "common.h"
 #include "gfx.h"
 #include "net.h"
+#include "stability_client.h"
 #include "update.h"
 #include "proto.h"
 #include "show.h"
@@ -278,6 +279,7 @@ int main(int argc, char **argv) {
     assert(net_online() && me && me->device == DEVICE_SWITCH);
   }
   update_shutdown();
+  stability_client_close();
   net_stop();
   conn_global_exit();
   gfx_exit();

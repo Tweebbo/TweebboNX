@@ -17,6 +17,7 @@
 #include "world.h"
 #include "update.h"
 #include "frame_pacing.h"
+#include "stability_client.h"
 
 void store_start(void);
 void store_stop(void);
@@ -27,27 +28,6 @@ int rnd_range(int lo, int hi) { return hi <= lo ? lo : lo + (int)((u32)rand() % 
 bool store_log_available(void) { return true; }
 void log_start(void);
 void log_stop(void);
-
-/** D-pad and stick: one step per press with a short repeat. */
-#include "input_repeat.h"
-static void walk_input(PadState *pad, u64 now) {
-  static InputRepeat repeat;
-  int dx = 0, dy = 0;
-  u64 held = padGetButtons(pad);
-  if (held & HidNpadButton_Up) dy = -1;
-  else if (held & HidNpadButton_Down) dy = 1;
-  else if (held & HidNpadButton_Left) dx = -1;
-  else if (held & HidNpadButton_Right) dx = 1;
-  else {
-    HidAnalogStickState l = padGetStickPos(pad, 0);
-    if (l.x > 12000) dx = 1;
-    else if (l.x < -12000) dx = -1;
-    else if (l.y > 12000) dy = -1;
-    else if (l.y < -12000) dy = 1;
-  }
-  if (!input_repeat(&repeat, dx, dy, now, pool_mode()==2 ? 80 : 180)) return;
-  show_walk(dx, dy);
-}
 
 int main(int argc, char **argv) {
   update_set_launch_path(argc > 0 ? argv[0] : NULL);
@@ -97,8 +77,9 @@ int main(int argc, char **argv) {
     }
     padUpdate(&pad);
     u64 down = padGetButtonsDown(&pad);
+    u64 held = padGetButtons(&pad);
     HidAnalogStickState stick = padGetStickPos(&pad, 0), right = padGetStickPos(&pad, 1);
-    input_active |= down || padGetButtons(&pad) || padGetButtonsUp(&pad) ||
+    input_active |= down || held || padGetButtonsUp(&pad) ||
       abs(stick.x) > 12000 || abs(stick.y) > 12000 || abs(right.x) > 12000 || abs(right.y) > 12000;
     if (down & HidNpadButton_A) show_action(SHOW_A);
     if (down & HidNpadButton_B) show_action(SHOW_B);
@@ -110,7 +91,12 @@ int main(int argc, char **argv) {
     if (down & HidNpadButton_ZR) show_action(SHOW_ZR);
     if (down & HidNpadButton_Minus) show_action(SHOW_OFFLINE);
     if ((down & HidNpadButton_Plus) && show_confirm_quit("+", now_ms())) running = false;
-    walk_input(&pad, now_ms());
+    unsigned dpad = 0;
+    if (held & HidNpadButton_Up) dpad |= WALK_PAD_UP;
+    if (held & HidNpadButton_Down) dpad |= WALK_PAD_DOWN;
+    if (held & HidNpadButton_Left) dpad |= WALK_PAD_LEFT;
+    if (held & HidNpadButton_Right) dpad |= WALK_PAD_RIGHT;
+    show_walk_pad(stick.x / 32767.0f, stick.y / 32767.0f, dpad, now_ms());
 
     bool touched = !tv && hidGetTouchScreenStates(&touch_state, 1) && touch_state.count;
     if (touched && !touching)
@@ -135,6 +121,7 @@ int main(int argc, char **argv) {
   }
 
   update_shutdown();
+  stability_client_close();
   net_stop();
   conn_global_exit();
   gfx_exit();
